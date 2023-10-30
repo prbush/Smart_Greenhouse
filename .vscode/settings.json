@@ -18,7 +18,9 @@
     "chrono": "c",
     "stdio.h": "c",
     "led_strip.h": "c",
-    "freertos.h": "c"
+    "freertos.h": "c",
+    "esp_system.h": "c",
+    "sdkconfig.h": "c"
   },
-  "idf.flashType": "JTAG"
+  "idf.flashType": "UART"
 }
