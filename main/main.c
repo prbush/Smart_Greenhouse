@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "led_strip.h"
+#include "environmental_sensor.h"
 
 
 // Defines
@@ -33,6 +34,7 @@ static uint8_t red, green, blue;
 void app_main(void)
 {
   xTaskCreate(led_task, "LED task", 4096, NULL, 5, &led_task_handle);
+  bmefunc();
 }
 
 void led_task(void* arg)
