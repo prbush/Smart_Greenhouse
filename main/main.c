@@ -87,9 +87,9 @@ static TaskHandle_t socket_task_handle = NULL;
 static EventGroupHandle_t s_wifi_event_group;
 
 // Static variables
-static const char *WIFI_TAG = "WIFI STATION";
+static const char *WIFI_TAG = "WIFI";
 static const char *LED_TAG = "LED";
-static const char *SOCKET_TAG = "SOCKET CLIENT";
+static const char *SOCKET_TAG = "SOCKET";
 static led_strip_handle_t led_strip;
 static uint8_t red, green, blue;
 static int s_retry_num = 0;
@@ -116,7 +116,7 @@ void app_main(void)
   wifi_init_sta();
 
   // Test socket
-  xTaskCreate(tcp_client, "Socket", 4096, NULL, 5, &socket_task_handle);
+  xTaskCreate(tcp_client, "Socket task", 4096, NULL, 5, &socket_task_handle);
 
   // Create RTOS threads
   xTaskCreate(led_task, "LED task", 4096, NULL, 5, &led_task_handle);
