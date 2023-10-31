@@ -11,7 +11,8 @@
 			"led_strip.h": "c",
 			"freertos.h": "c",
 			"esp_system.h": "c",
-			"sdkconfig.h": "c"
+			"sdkconfig.h": "c",
+			"typeinfo": "c"
 		},
 		"idf.openOcdConfigs": [
 			"board/esp32s3-builtin.cfg"
