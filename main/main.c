@@ -360,6 +360,7 @@ static void websocket_task(void *arg)
     shutdown_sema = xSemaphoreCreateBinary();
 
     websocket_cfg.uri = websocket_uri;
+    websocket_cfg.port = 8948;
 
     ESP_LOGI(WEBSOCKET_TAG, "Connecting to %s...", websocket_cfg.uri);
 

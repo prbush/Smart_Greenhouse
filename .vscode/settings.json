@@ -22,5 +22,5 @@
     "esp_system.h": "c",
     "sdkconfig.h": "c"
   },
-  "idf.flashType": "JTAG"
+  "idf.flashType": "UART"
 }
