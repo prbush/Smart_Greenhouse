@@ -3,16 +3,19 @@
 */
 
 // Includes
+/* C std libs */
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
-// #include <arpa/inet.h>
 #include <unistd.h>
-#include <sys/socket.h>
+
+/* FreeRTOS components */
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "freertos/semphr.h"
+
+/* ESP libs */
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -21,14 +24,16 @@
 #include "esp_random.h"
 #include "led_strip.h"
 #include "driver/gpio.h"
+
+/* Custom components */
 #include "environmental_sensor.h"
-#include "esp_websocket_client.h"
-// #include "protocol_examples_common.h"
-// #include "lwip/err.h"
-// #include "lwip/sys.h"
-// #include "lwip/sockets.h"
-// #include "lwip/dns.h"
-// Configuration items from menuconfig tool
+#include "fan.h"
+#include "firebase.h"
+#include "lights.h"
+#include "soil_sensor.h"
+#include "uv_sensor.h"
+
+/* Configuration items from menuconfig tool */
 #include "../build/config/sdkconfig.h"
 
 
@@ -381,7 +386,8 @@ static void websocket_task(void *arg)
     uint32_t dummy_iterator_modifier = 1;
     uint32_t sensor_string_len = strlen(sensor_string);
 
-    while (!websocket_disconnected) {
+    // while (!websocket_disconnected) {
+      while (1) {
 
       itoa((60 + dummy_iterator), temp_ptr + 3, 10);
       itoa((30 + dummy_iterator), pressure_ptr + 3, 10);
