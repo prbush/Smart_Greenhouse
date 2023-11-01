@@ -7,7 +7,7 @@
 
 #include "firebase.h"
 
-void func(void)
+esp_err_t firebase_push_data(char* data)
 {
-
+  return ESP_OK;
 }
