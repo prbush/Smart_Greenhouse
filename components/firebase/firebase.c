@@ -1,3 +1,5 @@
+
+
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -11,3 +13,4 @@ esp_err_t firebase_push_data(char* data)
 {
   return ESP_OK;
 }
+

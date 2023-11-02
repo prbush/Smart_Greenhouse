@@ -86,8 +86,9 @@
 #define WIFI_FAIL_BIT      BIT1
 
 
-
+//
 // Function prototypes
+
 /* Tasks */
 void led_task(void* arg);
 void firebase_task(void *arg);
@@ -115,6 +116,7 @@ static const char *LED_TAG = "LED";
 static led_strip_handle_t led_strip;
 static uint8_t red, green, blue;
 static int s_retry_num = 0;
+
 
 /*
 
@@ -147,7 +149,10 @@ void app_main(void)
   // Create RTOS threads
   xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
   xTaskCreate(led_task, "LED task", 4096, NULL, 5, &led_task_handle);
+
+  // This "main" task will be deleted after returning
 }
+
 
 /*
 
@@ -173,8 +178,12 @@ void led_task(void* arg)
 
 void firebase_task(void *arg)
 {
-  vTaskDelay(50);
+  while(1) {
+    vTaskDelay(50);
+  }
+  
 }
+
 
 /*
 
@@ -206,24 +215,12 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 
 /*
 
-Static helper functions
+Static functions
 
 */
-static void blink_led(uint32_t index, uint8_t red, uint8_t green, uint8_t blue, bool led_state)
-{
-  ESP_LOGI(LED_TAG, "Turning the LED %s!", led_state ? "ON" : "OFF");
-  /* If the addressable LED is enabled */
-  if (led_state) {
-      /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
-      led_strip_set_pixel(led_strip, index, red, green, blue);
-      /* Refresh the strip to send data */
-      led_strip_refresh(led_strip);
-  } else {
-      /* Set all LED off to clear all pixels */
-      led_strip_clear(led_strip);
-  }
-}
 
+//
+// Initialization functions
 static void configure_led(void)
 {
   ESP_LOGI(LED_TAG, "Example configured to blink addressable LED!");
@@ -300,5 +297,22 @@ static void wifi_init_sta(void)
                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
   } else {
       ESP_LOGE(WIFI_TAG, "UNEXPECTED EVENT");
+  }
+}
+
+//
+// Helper functions
+static void blink_led(uint32_t index, uint8_t red, uint8_t green, uint8_t blue, bool led_state)
+{
+  ESP_LOGI(LED_TAG, "Turning the LED %s!", led_state ? "ON" : "OFF");
+  /* If the addressable LED is enabled */
+  if (led_state) {
+      /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
+      led_strip_set_pixel(led_strip, index, red, green, blue);
+      /* Refresh the strip to send data */
+      led_strip_refresh(led_strip);
+  } else {
+      /* Set all LED off to clear all pixels */
+      led_strip_clear(led_strip);
   }
 }
