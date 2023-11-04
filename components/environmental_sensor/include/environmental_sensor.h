@@ -18,14 +18,13 @@ typedef struct Environmental_sensor {
   struct bme280_dev bme_dev_struct;
   struct bme280_settings bme_settings_struct;
 
-  Env_sensor_readings uncomp_readings;
-  Env_sensor_readings comp_readings;
+  struct bme280_data compensated_readings;
 
   i2c_port_t i2c_port_num;
   uint32_t i2c_timeout_ticks;
   uint8_t i2c_device_addr;
 
-  Env_sensor_readings (*get_readings)(void);
+  struct bme280_data (*get_readings)(void);
 
 } Environmental_sensor;
 

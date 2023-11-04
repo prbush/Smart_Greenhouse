@@ -4,6 +4,7 @@
 #include "driver/i2c.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "string.h"
 
 static Environmental_sensor *self;
 
@@ -14,7 +15,7 @@ BME280_INTF_RET_TYPE bme280_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32
 BME280_INTF_RET_TYPE bme280_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t length, void *intf_ptr);
 static void bme280_error_codes_print_result(const char *bme_fn_name, int8_t rslt);
 
-static Env_sensor_readings _environmental_sensor_get_readings(void);
+static struct bme280_data _environmental_sensor_get_readings(void);
 
 esp_err_t enviromental_sensor_init(Environmental_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port_t i2c_port_num)
 {
@@ -82,25 +83,16 @@ BME280_INTF_RET_TYPE bme280_i2c_write(uint8_t reg_addr, const uint8_t *reg_data,
     self->i2c_timeout_ticks);
 }
 
-static Env_sensor_readings _environmental_sensor_get_readings(void)
+static struct bme280_data _environmental_sensor_get_readings(void)
 {
-  Env_sensor_readings return_vals = {0};
+  BME280_INTF_RET_TYPE bme_return = BME280_OK;
+  struct bme280_data readings = {0};
 
-  /*
-  int8_t bme280_get_sensor_data(uint8_t sensor_comp, struct bme280_data *comp_data, struct bme280_dev *dev);
-  
-  log results
+  bme_return = bme280_get_sensor_data(BME280_ALL, &(self->compensated_readings), &(self->bme_dev_struct));
+  bme280_error_codes_print_result("bme280_get_sensor_data", bme_return);
 
-  int8_t bme280_compensate_data(uint8_t sensor_comp,
-                              const struct bme280_uncomp_data *uncomp_data,
-                              struct bme280_data *comp_data,
-                              struct bme280_calib_data *calib_data);
-
-  log results
-
-  return results
-  */
-  return return_vals;
+  memcpy(&readings, &(self->compensated_readings), sizeof(struct bme280_data));
+  return readings;
 }
 
 static void bme280_error_codes_print_result(const char *bme_fn_name, int8_t rslt)
