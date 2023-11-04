@@ -48,9 +48,15 @@
 
 /* WiFi settings */
 // TODO: remove unnecessary definitions and preprocessor commands
+#ifdef USE_HOTSPOT
+#define EXAMPLE_ESP_WIFI_SSID      "Phil_iPhone"
+#define EXAMPLE_ESP_WIFI_PASS      "esp32wificonnection"
+#define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
+#else
 #define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
 #define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
 #define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
+#endif
 
 #if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
 #define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_HUNT_AND_PECK
@@ -85,6 +91,9 @@
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
+// Firebase Realtime Database URL and API Key
+#define FIREBASE_URL "https://2141bacc-fef6-4411-82b6-2db68ea707ea.mock.pstmn.io/post"
+
 
 //
 // Function prototypes
@@ -107,16 +116,21 @@ static void wifi_init_sta(void);
 static TaskHandle_t led_task_handle = NULL;
 static TaskHandle_t firebase_task_handle = NULL;
 static EventGroupHandle_t s_wifi_event_group;
+static QueueHandle_t sensor_queue;
 
 /* Const strings */
 static const char *WIFI_TAG = "WIFI";
 static const char *LED_TAG = "LED";
+// Testing JSON string
+char * sample_json_string = "{\"Temp\":\"50\",\"Pressure\":\"90\",\"Humidity\":\"55\",\"UV A\":\"300\",\"UV B\":\"250\",\"UV C\":\"125\",\"Soil sensor\":\"1300\"}";
 
 /* Static objects and reference data */
 static led_strip_handle_t led_strip;
 static uint8_t red, green, blue;
 static int s_retry_num = 0;
 
+/* Passable Objects */
+Firebase fb;
 
 /*
 
@@ -178,8 +192,10 @@ void led_task(void* arg)
 
 void firebase_task(void *arg)
 {
+  firebase_init(&fb, FIREBASE_URL, &sensor_queue);
   while(1) {
-    vTaskDelay(50);
+    fb.send_data(sample_json_string);
+    vTaskDelay(100);
   }
   
 }
