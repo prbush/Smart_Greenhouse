@@ -28,6 +28,7 @@
 #include "esp_random.h"
 #include "led_strip.h"
 #include "driver/gpio.h"
+#include "driver/i2c.h"
 
 /* Custom components */
 #include "environmental_sensor.h"
@@ -48,6 +49,15 @@
 
 /* WiFi settings */
 // TODO: remove unnecessary definitions and preprocessor commands
+#ifdef USE_HOTSPOT
+#define EXAMPLE_ESP_WIFI_SSID      "Phil_iPhone"
+#define EXAMPLE_ESP_WIFI_PASS      "esp32wificonnection"
+#define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
+#else
+#define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
+#define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
+#define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
+#endif
 #define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
 #define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
 #define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
@@ -85,6 +95,18 @@
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
+// Firebase Realtime Database URL
+#define FIREBASE_URL "https://2141bacc-fef6-4411-82b6-2db68ea707ea.mock.pstmn.io/post"
+
+// I2C defines
+#define I2C_MASTER_SCL_IO           39      /*!< GPIO number used for I2C master clock */
+#define I2C_MASTER_SDA_IO           38      /*!< GPIO number used for I2C master data  */
+#define I2C_MASTER_NUM              0       /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
+#define I2C_MASTER_FREQ_HZ          400000  /*!< I2C master clock frequency */
+#define I2C_MASTER_TX_BUF_DISABLE   0       /*!< I2C master doesn't need buffer */
+#define I2C_MASTER_RX_BUF_DISABLE   0       /*!< I2C master doesn't need buffer */
+#define I2C_MASTER_TIMEOUT_MS       2500
+
 
 //
 // Function prototypes
@@ -92,6 +114,7 @@
 /* Tasks */
 void led_task(void* arg);
 void firebase_task(void *arg);
+void sensors_task(void *arg);
 
 /* Static helper functions and callbacks */
 static void blink_led(uint32_t index, uint8_t red, uint8_t green, uint8_t blue, bool led_state);
@@ -99,6 +122,7 @@ static void configure_led(void);
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data);
 static void wifi_init_sta(void);
+static esp_err_t i2c_master_init(void);
 
 //
 // Variables
@@ -106,17 +130,24 @@ static void wifi_init_sta(void);
 /* FreeRTOS variables */
 static TaskHandle_t led_task_handle = NULL;
 static TaskHandle_t firebase_task_handle = NULL;
+static TaskHandle_t sensors_task_handle = NULL;
 static EventGroupHandle_t s_wifi_event_group;
+static QueueHandle_t sensor_queue;
 
 /* Const strings */
 static const char *WIFI_TAG = "WIFI";
 static const char *LED_TAG = "LED";
+static const char *I2C_TAG = "I2C";
+// Testing JSON string
+char * sample_json_string = "{\"Temp\":\"50\",\"Pressure\":\"90\",\"Humidity\":\"55\",\"UV A\":\"300\",\"UV B\":\"250\",\"UV C\":\"125\",\"Soil sensor\":\"1300\"}";
 
 /* Static objects and reference data */
 static led_strip_handle_t led_strip;
 static uint8_t red, green, blue;
 static int s_retry_num = 0;
 
+/* Passable Objects */
+Firebase fb;
 
 /*
 
@@ -149,6 +180,7 @@ void app_main(void)
   // Create RTOS threads
   xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
   xTaskCreate(led_task, "LED task", 4096, NULL, 5, &led_task_handle);
+  xTaskCreate(sensors_task, "LED task", 8192, NULL, 5, &sensors_task_handle);
 
   // This "main" task will be deleted after returning
 }
@@ -178,10 +210,20 @@ void led_task(void* arg)
 
 void firebase_task(void *arg)
 {
+  firebase_init(&fb, FIREBASE_URL, &sensor_queue);
+  while(1) {
+    fb.send_data(sample_json_string);
+    vTaskDelay(100);
+  }
+}
+
+void sensors_task(void* arg)
+{
+  ESP_ERROR_CHECK(i2c_master_init());
+  ESP_LOGI(I2C_TAG, "I2C initialized successfully");
   while(1) {
     vTaskDelay(50);
   }
-  
 }
 
 
@@ -298,6 +340,24 @@ static void wifi_init_sta(void)
   } else {
       ESP_LOGE(WIFI_TAG, "UNEXPECTED EVENT");
   }
+}
+
+static esp_err_t i2c_master_init(void)
+{
+    int i2c_master_port = I2C_MASTER_NUM;
+
+    i2c_config_t conf = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = I2C_MASTER_SDA_IO,
+        .scl_io_num = I2C_MASTER_SCL_IO,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+    };
+
+    i2c_param_config(i2c_master_port, &conf);
+
+    return i2c_driver_install(i2c_master_port, conf.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
 }
 
 //
