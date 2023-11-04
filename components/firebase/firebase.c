@@ -11,8 +11,6 @@
 
 static Firebase* self;
 
-
-
 static const char *HTTP_TAG = "HTTP";
 
 extern const char cert_start[] asm("_binary_certificate_pem_start");
@@ -20,6 +18,28 @@ extern const char cert_end[]   asm("_binary_certificate_pem_end");
 
 static esp_err_t _firebase_send_data(const char *data);
 static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
+
+/*
+Sample JSON
+
+{ "name": "Smart Greenhouse",
+  "sensors": {
+      "Temperature": 0,
+      "Pressure": 0,
+      "Humidity": 0,
+      "UV A": 0,
+      "UV B": 0,
+      "UV C": 0
+   },
+
+   "Status": {
+      "Fan": true,
+      "Lights": true,
+      "PDLC": true
+   }
+}
+
+*/
 
 void firebase_init(Firebase* fb_struct_ptr, const char* url, QueueHandle_t* sensor_queue)
 {

@@ -20,7 +20,10 @@
     "led_strip.h": "c",
     "freertos.h": "c",
     "esp_system.h": "c",
-    "sdkconfig.h": "c"
+    "sdkconfig.h": "c",
+    "array": "c",
+    "string": "c",
+    "string_view": "c"
   },
   "idf.flashType": "UART"
 }
