@@ -29,7 +29,7 @@ esp_err_t enviromental_sensor_init(Environmental_sensor *struct_ptr, uint32_t ti
   self->bme_dev_struct.intf = BME280_I2C_INTF;
   self->bme_dev_struct.write = bme280_i2c_write;
   self->bme_dev_struct.read = bme280_i2c_read;
-  self->bme_dev_struct.intf_ptr = &(self->i2c_addr);
+  self->bme_dev_struct.intf_ptr = &(self->i2c_device_addr);
   self->bme_dev_struct.delay_us = BME280_delay_usec;
 
   self->get_readings = _environmental_sensor_get_readings;
@@ -110,27 +110,27 @@ static void bme280_error_codes_print_result(const char *bme_fn_name, int8_t rslt
     switch (rslt)
     {
       case BME280_E_NULL_PTR:
-        ESP_LOGE(BME_TAG, "Error [%d] : Null pointer error. It occurs when the user tries to assign value "
-          "(not address) to a pointer, which has been initialized to NULL.", rslt);
+        ESP_LOGE(BME_TAG, "%s() returned error [%d] : Null pointer error. It occurs when the user tries to assign value "
+          "(not address) to a pointer, which has been initialized to NULL.", bme_fn_name, rslt);
         break;
 
       case BME280_E_COMM_FAIL:
-        ESP_LOGE(BME_TAG, "Error [%d] : Communication failure error. It occurs due to read/write operation "
-          "failure and also due to power failure during communication", rslt);
+        ESP_LOGE(BME_TAG, "%s() returned error [%d] : Communication failure error. It occurs due to read/write operation "
+          "failure and also due to power failure during communication", bme_fn_name, rslt);
         break;
 
       case BME280_E_DEV_NOT_FOUND:
-        ESP_LOGE(BME_TAG, "Error [%d] : Device not found error. It occurs when the device chip id is incorrectly read.",
-          rslt);
+        ESP_LOGE(BME_TAG, "%s() returned error [%d] : Device not found error. It occurs when the device chip id is "
+          "incorrectly read.", bme_fn_name, rslt);
         break;
 
       case BME280_E_INVALID_LEN:
-        ESP_LOGE(BME_TAG, "Error [%d] : Invalid length error. It occurs when write is done with invalid length.", 
-          rslt);
+        ESP_LOGE(BME_TAG, "%s() returned error [%d] : Invalid length error. It occurs when write is done with invalid "
+          "length.", bme_fn_name, rslt);
         break;
 
       default:
-        ESP_LOGE(BME_TAG, "Error [%d] : Unknown error code.", rslt);
+        ESP_LOGE(BME_TAG, "%s() returned error [%d] : Unknown error code.", bme_fn_name, rslt);
         break;
     }
   }

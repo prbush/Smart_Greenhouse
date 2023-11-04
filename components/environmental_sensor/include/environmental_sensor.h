@@ -29,6 +29,6 @@ typedef struct Environmental_sensor {
 
 } Environmental_sensor;
 
-esp_err_t enviromental_sensor_init(Environmental_sensor *struct_ptr, uint32_t timeout);
+esp_err_t enviromental_sensor_init(Environmental_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port_t i2c_port_num);
 
 #endif /* ENVIRONMENTAL_SENSOR_H */
