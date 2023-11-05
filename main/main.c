@@ -50,9 +50,7 @@ typedef enum status_state {
 
 typedef struct sensor_data{
   struct bme280_data bme280_data;
-  uint16_t UV_A;
-  uint16_t UV_B;
-  uint16_t UV_C;
+  UV_values uv_data;
 } sensor_data_struct;
 
 typedef struct status_data {
@@ -179,6 +177,7 @@ static int s_retry_num = 0;
 /* Passable Objects */
 Firebase fb;
 Environmental_sensor env;
+UV_sensor uv;
 
 /*
 
@@ -267,6 +266,8 @@ void sensors_task(void* arg)
 {
   sensor_data_struct sensor_data = {0};
   struct bme280_data env_sensor_readings = {0};
+  UV_values          uv_readings = {0};
+  esp_err_t return_code;
 
   // Initialize I2C as master
   ESP_ERROR_CHECK(i2c_master_init());
@@ -276,8 +277,17 @@ void sensors_task(void* arg)
   enviromental_sensor_init(&env, portTICK_PERIOD_MS / 25 /* 25Hz */, I2C_MASTER_NUM);
 
   while(1) {
+    // Zero out the structs to start fresh
+    memcpy(&sensor_data, 0, sizeof(sensor_data_struct));
+    memcpy(&env_sensor_readings, 0, sizeof(struct bme280_data));
+    memcpy(&uv_readings, 0, sizeof(UV_values));
+
     // Get BME280 readings
-    env_sensor_readings = env.get_readings();
+    return_code = env.get_readings(&env_sensor_readings);
+
+    // TODO: check error code, determine some way of indicating sensor failure over the 
+
+
     // Log results
     ESP_LOGI(I2C_TAG, "Environmental sensor readings: Temp = %lf, Pres = %lf, Rh = %lf",
       env_sensor_readings.temperature, env_sensor_readings.pressure, env_sensor_readings.humidity);
@@ -288,6 +298,9 @@ void sensors_task(void* arg)
     // ...
     // Gather soil sensor readings
     // ...
+
+    // Copy to sensor_data_struct
+    memcpy(&(sensor_data.uv_data), &uv_readings, sizeof(UV_values));
 
     // Send the sensor data to the environmental_control_task
     xQueueGenericSend(sensor_queue, &sensor_data, 1, queueSEND_TO_BACK);

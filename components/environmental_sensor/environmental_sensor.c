@@ -7,20 +7,26 @@
 #include "string.h"
 #include "sdkconfig.h"
 
-// Static object pointer
+// Static private object pointer
 static Environmental_sensor *self;
+
 // Logger tag
 static const char *BME_TAG = "BME280";
-// BME280 lib porting functions
-void BME280_delay_usec(uint32_t msec, void *intf_ptr);
-BME280_INTF_RET_TYPE bme280_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length, void *intf_ptr);
-BME280_INTF_RET_TYPE bme280_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t length, void *intf_ptr);
-// Helper functions
-static void bme280_error_codes_print_result(const char *bme_fn_name, int8_t rslt);
-// Private functions
-static struct bme280_data _environmental_sensor_get_readings(void);
 
-esp_err_t enviromental_sensor_init(Environmental_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port_t i2c_port_num)
+// BME280 lib porting functions
+void                      BME280_delay_usec(uint32_t msec, void *intf_ptr);
+BME280_INTF_RET_TYPE      bme280_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length, void *intf_ptr);
+BME280_INTF_RET_TYPE      bme280_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t length, void *intf_ptr);
+
+// Helper functions
+static void               bme280_error_codes_print_result(const char *bme_fn_name, int8_t rslt);
+
+// Private functions
+static esp_err_t          _environmental_sensor_get_readings(struct bme280_data* return_data);
+
+// Public init function
+esp_err_t                 enviromental_sensor_init(Environmental_sensor *struct_ptr, uint32_t timeout_ticks, 
+                            i2c_port_t i2c_port_num)
 {
   esp_err_t return_code = ESP_OK;
   BME280_INTF_RET_TYPE bme_return = BME280_OK;
@@ -161,22 +167,31 @@ static void bme280_error_codes_print_result(const char *bme_fn_name, int8_t rslt
   }
 }
 
-static struct bme280_data _environmental_sensor_get_readings(void)
+static esp_err_t _environmental_sensor_get_readings(struct bme280_data* return_data)
 {
+  esp_err_t return_code = ESP_OK;
   BME280_INTF_RET_TYPE bme_return = BME280_OK;
-  struct bme280_data readings = {0};
 
   // Set the sensor to forced mode
   // Set the BME280 sensor mode to Forced (polling) mode
   bme_return = bme280_set_sensor_mode(BME280_POWERMODE_FORCED, &(self->bme_dev_struct));
   bme280_error_codes_print_result("bme280_set_sensor_mode", bme_return);
+  if (bme_return != BME280_OK) {
+    return_code = ESP_FAIL;
+    return return_code;
+  }
 
   // Delay until the measurement is done
   self->bme_dev_struct.delay_us(self->delay_period, self->bme_dev_struct.intf_ptr);
   // Write the results to the struct
   bme_return = bme280_get_sensor_data(BME280_ALL, &(self->compensated_readings), &(self->bme_dev_struct));
   bme280_error_codes_print_result("bme280_get_sensor_data", bme_return);
+  if (bme_return != BME280_OK) {
+    return_code = ESP_FAIL;
+    return return_code;
+  }
+  
   // Copy the results to the return struct
-  memcpy(&readings, &(self->compensated_readings), sizeof(struct bme280_data));
-  return readings;
+  memcpy(return_data, &(self->compensated_readings), sizeof(struct bme280_data));
+  return return_code;
 }
