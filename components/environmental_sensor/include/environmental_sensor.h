@@ -8,11 +8,7 @@
 
 #define BME_280_I2C_ADDR 0x77
 
-typedef struct Env_sensor_readings {
-  int32_t temperature;
-  int32_t pressure;
-  int32_t humidity;
-} Env_sensor_readings;
+#define BUFFER_SIZE 128
 
 typedef struct Environmental_sensor {
   struct bme280_dev bme_dev_struct;
@@ -22,7 +18,11 @@ typedef struct Environmental_sensor {
 
   i2c_port_t i2c_port_num;
   uint32_t i2c_timeout_ticks;
+  uint32_t delay_period;
   uint8_t i2c_device_addr;
+
+  uint8_t read_buffer[BUFFER_SIZE];
+  uint8_t write_buffer[BUFFER_SIZE];
 
   struct bme280_data (*get_readings)(void);
 

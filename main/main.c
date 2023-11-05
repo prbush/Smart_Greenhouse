@@ -148,6 +148,7 @@ static int s_retry_num = 0;
 
 /* Passable Objects */
 Firebase fb;
+Environmental_sensor env;
 
 /*
 
@@ -219,9 +220,19 @@ void firebase_task(void *arg)
 
 void sensors_task(void* arg)
 {
+  struct bme280_data env_sensor_readings = {0};
+
+  // Initialize I2C as master
   ESP_ERROR_CHECK(i2c_master_init());
   ESP_LOGI(I2C_TAG, "I2C initialized successfully");
+
+  // Initialize the BME280 Environmental sensor
+  enviromental_sensor_init(&env, portTICK_PERIOD_MS / 25 /* 25Hz */, I2C_MASTER_NUM);
+
   while(1) {
+    env_sensor_readings = env.get_readings();
+    ESP_LOGI(I2C_TAG, "Environmental sensor readings: Temp = %lf, Pres = %lf, Rh = %lf",
+      env_sensor_readings.temperature, env_sensor_readings.pressure, env_sensor_readings.humidity);
     vTaskDelay(50);
   }
 }
