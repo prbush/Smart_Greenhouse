@@ -42,6 +42,31 @@
 #include "../build/config/sdkconfig.h"
 
 //
+// Structs, enums, typedefs
+typedef enum status_state {
+  OFF = 0,
+  ON = 1
+} status_state_t;
+
+typedef struct sensor_data{
+  struct bme280_data bme280_data;
+  uint16_t UV_A;
+  uint16_t UV_B;
+  uint16_t UV_C;
+} sensor_data_struct;
+
+typedef struct status_data {
+  status_state_t fan_state;
+  status_state_t lights_state;
+  status_state_t pdlc_state; 
+} status_data_struct;
+
+typedef struct Firebase_data {
+  sensor_data_struct sensor_data;
+  status_data_struct status_data;
+} firebase_data_struct;
+
+//
 // Defines
 
 /* GPIO pin assignments */
@@ -115,6 +140,7 @@
 void led_task(void* arg);
 void firebase_task(void *arg);
 void sensors_task(void *arg);
+void environmental_control_task(void *arg);
 
 /* Static helper functions and callbacks */
 static void blink_led(uint32_t index, uint8_t red, uint8_t green, uint8_t blue, bool led_state);
@@ -131,8 +157,12 @@ static esp_err_t i2c_master_init(void);
 static TaskHandle_t led_task_handle = NULL;
 static TaskHandle_t firebase_task_handle = NULL;
 static TaskHandle_t sensors_task_handle = NULL;
+static TaskHandle_t environmental_control_task_handle = NULL;
 static EventGroupHandle_t s_wifi_event_group;
+static EventGroupHandle_t task_control_events;
+static QueueHandle_t firebase_queue;
 static QueueHandle_t sensor_queue;
+static QueueHandle_t env_ctrl_queue;
 
 /* Const strings */
 static const char *WIFI_TAG = "WIFI";
@@ -157,6 +187,13 @@ App entry point
 */
 void app_main(void)
 {
+  // Create our event groups and queues
+  s_wifi_event_group = xEventGroupCreate();
+  task_control_events = xEventGroupCreate();
+  firebase_queue = xQueueCreate(10, sizeof(firebase_data_struct));
+  sensor_queue = xQueueCreate(10, sizeof(sensor_data_struct));
+  env_ctrl_queue = xQueueCreate(10, sizeof(status_data_struct));
+
   //Initialize NVS, needed for WiFi
   esp_err_t ret = nvs_flash_init();
 
@@ -172,8 +209,6 @@ void app_main(void)
   ret = esp_event_loop_create_default();
   ESP_ERROR_CHECK(ret);
 
-  
-
   ESP_LOGI(WIFI_TAG, "ESP_WIFI_MODE_STA");
   // Connect to WiFi
   wifi_init_sta();
@@ -181,7 +216,8 @@ void app_main(void)
   // Create RTOS threads
   xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
   xTaskCreate(led_task, "LED task", 4096, NULL, 5, &led_task_handle);
-  xTaskCreate(sensors_task, "LED task", 8192, NULL, 5, &sensors_task_handle);
+  xTaskCreate(sensors_task, "Sensors task", 8192, NULL, 5, &sensors_task_handle);
+  xTaskCreate(environmental_control_task, "Env ctrl task", 8192, NULL, 5, &environmental_control_task_handle);
 
   // This "main" task will be deleted after returning
 }
@@ -211,8 +247,17 @@ void led_task(void* arg)
 
 void firebase_task(void *arg)
 {
-  firebase_init(&fb, FIREBASE_URL, &sensor_queue);
+  firebase_data_struct firebase_data = {0};
+
+  firebase_init(&fb, FIREBASE_URL, &firebase_queue);
   while(1) {
+    // Wait until we get a message from the enviromental control task
+    xQueueReceive(firebase_queue, &firebase_data, (2500 / portTICK_PERIOD_MS));
+
+    // Assemble a JSON string with the firebase data
+    // ...
+
+    // Send the data to firebase
     fb.send_data(sample_json_string);
     vTaskDelay(100);
   }
@@ -220,6 +265,7 @@ void firebase_task(void *arg)
 
 void sensors_task(void* arg)
 {
+  sensor_data_struct sensor_data = {0};
   struct bme280_data env_sensor_readings = {0};
 
   // Initialize I2C as master
@@ -230,10 +276,53 @@ void sensors_task(void* arg)
   enviromental_sensor_init(&env, portTICK_PERIOD_MS / 25 /* 25Hz */, I2C_MASTER_NUM);
 
   while(1) {
+    // Get BME280 readings
     env_sensor_readings = env.get_readings();
+    // Log results
     ESP_LOGI(I2C_TAG, "Environmental sensor readings: Temp = %lf, Pres = %lf, Rh = %lf",
       env_sensor_readings.temperature, env_sensor_readings.pressure, env_sensor_readings.humidity);
+    // Copy to sensor_data_struct
+    memcpy(&(sensor_data.bme280_data), &env_sensor_readings, sizeof(struct bme280_data));
+
+    // Gather UV sensor readings
+    // ...
+    // Gather soil sensor readings
+    // ...
+
+    // Send the sensor data to the environmental_control_task
+    xQueueGenericSend(sensor_queue, &sensor_data, 1, queueSEND_TO_BACK);
+
     vTaskDelay(50);
+  }
+}
+
+void environmental_control_task(void *arg)
+{
+  sensor_data_struct sensor_data = {0};
+  status_data_struct status_data = {0};
+  firebase_data_struct firebase_data = {0};
+
+  while(1) {
+
+    // Wait until we get a message with sensor data
+    xQueueReceive(sensor_queue, &sensor_data, (2500 / portTICK_PERIOD_MS));
+    // Check for an empty message
+
+    // Make enviromental changes (fan, pdlc, lights) as needed based on sensor data and set thresholds
+    // ...
+    
+    // Gather statuses of the fan, pdlc, lights
+    // ...
+
+    // Assemble the firebase data struct
+    memcpy(&(firebase_data.sensor_data), &sensor_data, sizeof(sensor_data_struct));
+    memcpy(&(firebase_data.status_data), &status_data, sizeof(status_data_struct));
+
+    // Send the message to the firebase task
+    xQueueSend(firebase_queue, &firebase_data, 1);
+
+    vTaskDelay(50);
+
   }
 }
 
