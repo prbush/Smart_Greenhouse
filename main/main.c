@@ -122,8 +122,8 @@ typedef struct Firebase_data {
 #define FIREBASE_URL "https://2141bacc-fef6-4411-82b6-2db68ea707ea.mock.pstmn.io/post"
 
 // I2C defines
-#define I2C_MASTER_SCL_IO           39      /*!< GPIO number used for I2C master clock */
-#define I2C_MASTER_SDA_IO           38      /*!< GPIO number used for I2C master data  */
+#define I2C_MASTER_SCL_IO           4       /*!< GPIO number used for I2C master clock */
+#define I2C_MASTER_SDA_IO           5       /*!< GPIO number used for I2C master data  */
 #define I2C_MASTER_NUM              0       /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
 #define I2C_MASTER_FREQ_HZ          400000  /*!< I2C master clock frequency */
 #define I2C_MASTER_TX_BUF_DISABLE   0       /*!< I2C master doesn't need buffer */
@@ -267,14 +267,14 @@ void sensors_task(void* arg)
   sensor_data_struct sensor_data = {0};
   struct bme280_data env_sensor_readings = {0};
   UV_values          uv_readings = {0};
-  esp_err_t return_code;
+  esp_err_t          return_code;
 
   // Initialize I2C as master
   ESP_ERROR_CHECK(i2c_master_init());
   ESP_LOGI(I2C_TAG, "I2C initialized successfully");
 
   // Initialize the BME280 Environmental sensor
-  enviromental_sensor_init(&env, portTICK_PERIOD_MS / 25 /* 25Hz */, I2C_MASTER_NUM);
+  enviromental_sensor_init(&env, portTICK_PERIOD_MS / 25 /* 25Hz */, I2C_NUM_0);
 
   while(1) {
     // Zero out the structs to start fresh
@@ -289,7 +289,7 @@ void sensors_task(void* arg)
 
 
     // Log results
-    ESP_LOGI(I2C_TAG, "Environmental sensor readings: Temp = %lf, Pres = %lf, Rh = %lf",
+    ESP_LOGI(I2C_TAG, "Environmental sensor readings: Temp = %.3lf degC, Pres = %.3lf hPa, Rh = %.3lf %%",
       env_sensor_readings.temperature, env_sensor_readings.pressure, env_sensor_readings.humidity);
     // Copy to sensor_data_struct
     memcpy(&(sensor_data.bme280_data), &env_sensor_readings, sizeof(struct bme280_data));
@@ -457,8 +457,6 @@ static void wifi_init_sta(void)
 
 static esp_err_t i2c_master_init(void)
 {
-    int i2c_master_port = I2C_MASTER_NUM;
-
     i2c_config_t conf = {
         .mode = I2C_MODE_MASTER,
         .sda_io_num = I2C_MASTER_SDA_IO,
@@ -468,9 +466,9 @@ static esp_err_t i2c_master_init(void)
         .master.clk_speed = I2C_MASTER_FREQ_HZ,
     };
 
-    i2c_param_config(i2c_master_port, &conf);
+    i2c_param_config(I2C_NUM_0, &conf);
 
-    return i2c_driver_install(i2c_master_port, conf.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
+    return i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
 }
 
 //

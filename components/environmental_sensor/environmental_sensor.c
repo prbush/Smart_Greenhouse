@@ -93,6 +93,7 @@ void BME280_delay_usec(uint32_t usec, void *intf_ptr)
  */
 BME280_INTF_RET_TYPE bme280_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length, void *intf_ptr)
 {
+  esp_err_t return_code = ESP_OK;
 
   if (length > BUFFER_SIZE) {
     ESP_LOGE(BME_TAG, "Read data length exceeds buffer length in bme280_i2c_read: Buffer length = %d, requested "
@@ -103,17 +104,14 @@ BME280_INTF_RET_TYPE bme280_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32
 
   memset(&(self->read_buffer[0]), 0, BUFFER_SIZE);
 
-  return i2c_master_write_read_device(self->i2c_port_num, self->i2c_device_addr, &reg_addr, 1,
-          &(self->read_buffer[0]), length, self->i2c_timeout_ticks);
-}
+  return_code = i2c_master_write_read_device(self->i2c_port_num, self->i2c_device_addr, &reg_addr, 1,
+          reg_data, length, self->i2c_timeout_ticks);
 
-/*
-static esp_err_t mpu9250_register_read(uint8_t reg_addr, uint8_t *data, size_t len)
-{
-    return i2c_master_write_read_device(I2C_MASTER_NUM, MPU9250_SENSOR_ADDR, &reg_addr, 1, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+  // Copy over the data to the internal struct buffer
+  memcpy(&(self->read_buffer[0]), reg_data, length);
+  
+  return (BME280_INTF_RET_TYPE) return_code;
 }
-
-*/
 
 /*!
  * I2C write function
