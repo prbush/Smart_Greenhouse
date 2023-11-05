@@ -24,9 +24,10 @@ static void               bme280_error_codes_print_result(const char *bme_fn_nam
 // Private functions
 static esp_err_t          _environmental_sensor_get_readings(struct bme280_data* return_data);
 
+
+
 // Public init function
-esp_err_t                 enviromental_sensor_init(Environmental_sensor *struct_ptr, uint32_t timeout_ticks, 
-                            i2c_port_t i2c_port_num)
+esp_err_t enviromental_sensor_init(Environmental_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port_t i2c_port_num)
 {
   esp_err_t return_code = ESP_OK;
   BME280_INTF_RET_TYPE bme_return = BME280_OK;
@@ -50,7 +51,8 @@ esp_err_t                 enviromental_sensor_init(Environmental_sensor *struct_
 
   // Must first get the settings before we can change them
   bme_return = bme280_get_sensor_settings(&(self->bme_settings_struct), &(self->bme_dev_struct));
-
+  bme280_error_codes_print_result("bme280_init", bme_return);
+  
   // Assign bme280_settings struct fields
   // Using recommended "indoor navigation" settings for low noise readings @ 25Hz
   self->bme_settings_struct.osr_p = BME280_OVERSAMPLING_16X;
@@ -91,24 +93,27 @@ void BME280_delay_usec(uint32_t usec, void *intf_ptr)
  */
 BME280_INTF_RET_TYPE bme280_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length, void *intf_ptr)
 {
-  int actual_read_length = (length + 1);
 
-  if (actual_read_length > BUFFER_SIZE) {
+  if (length > BUFFER_SIZE) {
     ESP_LOGE(BME_TAG, "Read data length exceeds buffer length in bme280_i2c_read: Buffer length = %d, requested "
-      "read length = %d", BUFFER_SIZE, actual_read_length);
+      "read length = %lu", BUFFER_SIZE, length);
     
     return BME280_E_INVALID_LEN;
   }
 
   memset(&(self->read_buffer[0]), 0, BUFFER_SIZE);
 
-  self->read_buffer[0] = reg_addr;
-
-  memcpy(&(self->read_buffer[1]), reg_data, length);
-
-  return i2c_master_read_from_device(self->i2c_port_num, self->i2c_device_addr, &(self->read_buffer[0]), 
-    actual_read_length, self->i2c_timeout_ticks);
+  return i2c_master_write_read_device(self->i2c_port_num, self->i2c_device_addr, &reg_addr, 1,
+          &(self->read_buffer[0]), length, self->i2c_timeout_ticks);
 }
+
+/*
+static esp_err_t mpu9250_register_read(uint8_t reg_addr, uint8_t *data, size_t len)
+{
+    return i2c_master_write_read_device(I2C_MASTER_NUM, MPU9250_SENSOR_ADDR, &reg_addr, 1, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+}
+
+*/
 
 /*!
  * I2C write function

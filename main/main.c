@@ -257,7 +257,7 @@ void firebase_task(void *arg)
     // ...
 
     // Send the data to firebase
-    fb.send_data(sample_json_string);
+    // fb.send_data(sample_json_string);
     vTaskDelay(100);
   }
 }

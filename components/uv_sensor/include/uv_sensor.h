@@ -56,7 +56,7 @@ typedef struct UV_sensor{
 
   // uint8_t   (*get_id)(void);
   void      (*reset)(void);
-  esp_err_t (*get_readings)(UV_values* return_data);
+  esp_err_t (*get_readings)(UV_values* return_data); 
 } UV_sensor;
 
 esp_err_t uv_sensor_init(UV_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port_t i2c_port_num);

@@ -47,7 +47,8 @@ esp_err_t uv_sensor_init(UV_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port
   }
 
   // Apply settings
-
+  //...
+  // Check statuses?
 
 
 

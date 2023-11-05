@@ -25,5 +25,5 @@
     "string": "c",
     "string_view": "c"
   },
-  "idf.flashType": "UART"
+  "idf.flashType": "JTAG"
 }
