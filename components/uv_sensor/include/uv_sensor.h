@@ -2,13 +2,12 @@
 #define UV_SENSOR_H
 
 #include <stdint.h>
-#include "bme280.h"
 #include "esp_err.h"
 #include "driver/i2c.h"
 
 // Configuration State registers
 #define AS7331_OSR                      0x00
-#define AS7331_AGEN                     0x02  // should be 0x21
+#define AS7331_AGEN                     0x02
 #define AS7331_CREG1                    0x06   
 #define AS7331_CREG2                    0x07
 #define AS7331_CREG3                    0x08
@@ -25,6 +24,8 @@
 #define AS7331_OUTCONVH                 0x06
 // I2C Address
 #define AS7331_ADDRESS  0x74
+// Default Chip ID
+#define AS7331_ID       0x21
 
 // Measurement modes -- we'll use CMD (forced) mode
 typedef enum measurement_mode{
@@ -53,9 +54,9 @@ typedef struct UV_sensor{
   UV_values raw_counts;
   UV_values converted_vals;
 
-  uint8_t   (*get_id)(void);
+  // uint8_t   (*get_id)(void);
   void      (*reset)(void);
-  esp_err_t (*get_readings)(void);
+  esp_err_t (*get_readings)(UV_values* return_data);
 } UV_sensor;
 
 esp_err_t uv_sensor_init(UV_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port_t i2c_port_num);

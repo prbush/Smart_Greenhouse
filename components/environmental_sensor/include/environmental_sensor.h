@@ -24,7 +24,7 @@ typedef struct Environmental_sensor {
   uint8_t read_buffer[BUFFER_SIZE];
   uint8_t write_buffer[BUFFER_SIZE];
 
-  struct bme280_data (*get_readings)(void);
+  esp_err_t (*get_readings)(struct bme280_data* return_data);
 
 } Environmental_sensor;
 

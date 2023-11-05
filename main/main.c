@@ -278,9 +278,9 @@ void sensors_task(void* arg)
 
   while(1) {
     // Zero out the structs to start fresh
-    memcpy(&sensor_data, 0, sizeof(sensor_data_struct));
-    memcpy(&env_sensor_readings, 0, sizeof(struct bme280_data));
-    memcpy(&uv_readings, 0, sizeof(UV_values));
+    memset(&sensor_data, 0, sizeof(sensor_data_struct));
+    memset(&env_sensor_readings, 0, sizeof(struct bme280_data));
+    memset(&uv_readings, 0, sizeof(UV_values));
 
     // Get BME280 readings
     return_code = env.get_readings(&env_sensor_readings);
