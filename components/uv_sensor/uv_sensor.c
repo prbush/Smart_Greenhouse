@@ -26,7 +26,9 @@ static void       _uv_sensor_reset(void);
 static esp_err_t  _uv_sensor_get_readings(UV_converted_values* return_data);
 
 
-// Public init function
+/*!
+ * Public init function
+ */
 esp_err_t uv_sensor_init(UV_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port_t i2c_port_num)
 {
   esp_err_t return_code = ESP_OK;
@@ -169,11 +171,13 @@ static void uv_sensor_get_status(void)
 static void uv_sensor_apply_settings(measurement_mode_t mode, standby_bit_t standby, uint8_t break_time,
               uint8_t gain, internal_clock_t internal_clock, creg1_time_t conversion_time)
 {
-  uint8_t creg1_bits = ((mode << 6) | (gain << 4) | conversion_time);
+  uint8_t creg1_bits = ((gain << 4) | conversion_time);
+  uint8_t creg2_bits = 0x01;
   uint8_t creg3_bits = ((mode << 6) | (standby << 4) | internal_clock);
 
   uv_generic_i2c_write(AS7331_CREG1, &creg1_bits, 1);
-  uv_generic_i2c_write(AS7331_CREG1, &creg3_bits, 1);
+  uv_generic_i2c_write(AS7331_CREG2, &creg2_bits, 1);
+  uv_generic_i2c_write(AS7331_CREG3, &creg3_bits, 1);
 }
 
 /*!

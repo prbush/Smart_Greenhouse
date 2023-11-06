@@ -35,6 +35,7 @@
 #define AS7331_ID       0x21
 // Settings values
 #define GAIN_8X         0x08
+#define GAIN_2X         0x0A
 
 #define BUFFER_SIZE 128
 
@@ -62,7 +63,7 @@ typedef enum creg1_time {
   _2048   = 0b1011,
   _4096   = 0b1100,
   _8192   = 0b1101,
-  _16384  = 0b1110,
+  _16384  = 0b1110
 } creg1_time_t;
 // Optional standby bit
 typedef enum standby_bit {

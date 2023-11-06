@@ -26,7 +26,9 @@ static esp_err_t          _environmental_sensor_get_readings(struct bme280_data*
 
 
 
-// Public init function
+/*!
+ * Public init function
+ */
 esp_err_t enviromental_sensor_init(Environmental_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port_t i2c_port_num)
 {
   esp_err_t return_code = ESP_OK;
