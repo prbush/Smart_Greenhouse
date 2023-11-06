@@ -50,7 +50,7 @@ typedef enum status_state {
 
 typedef struct sensor_data{
   struct bme280_data bme280_data;
-  UV_values uv_data;
+  UV_converted_values uv_data;
 } sensor_data_struct;
 
 typedef struct status_data {
@@ -214,7 +214,7 @@ void app_main(void)
 
   // Create RTOS threads
   xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
-  xTaskCreate(led_task, "LED task", 4096, NULL, 5, &led_task_handle);
+  // xTaskCreate(led_task, "LED task", 4096, NULL, 5, &led_task_handle);
   xTaskCreate(sensors_task, "Sensors task", 8192, NULL, 5, &sensors_task_handle);
   xTaskCreate(environmental_control_task, "Env ctrl task", 8192, NULL, 5, &environmental_control_task_handle);
 
@@ -264,29 +264,37 @@ void firebase_task(void *arg)
 
 void sensors_task(void* arg)
 {
-  sensor_data_struct sensor_data = {0};
-  struct bme280_data env_sensor_readings = {0};
-  UV_values          uv_readings = {0};
-  esp_err_t          return_code;
+  sensor_data_struct  sensor_data = {0};
+  struct bme280_data  env_sensor_readings = {0};
+  UV_converted_values uv_readings = {0};
+  esp_err_t           return_code;
 
   // Initialize I2C as master
   ESP_ERROR_CHECK(i2c_master_init());
   ESP_LOGI(I2C_TAG, "I2C initialized successfully");
 
   // Initialize the BME280 Environmental sensor
-  enviromental_sensor_init(&env, portTICK_PERIOD_MS / 25 /* 25Hz */, I2C_NUM_0);
+  // TODO: do something with the return code, probably just reset
+  return_code = enviromental_sensor_init(&env, (((1 / portTICK_PERIOD_MS) / 25) + 1) /* 25Hz */, I2C_NUM_0);
+  // If the sensor doesn't initialize properly, resart and try again
+  if (return_code != ESP_OK) {
+    esp_restart();
+  }
+  return_code = uv_sensor_init(&uv, ((512 / portTICK_PERIOD_MS) + 1), I2C_NUM_0);
+
+  if (return_code != ESP_OK) {
+    esp_restart();
+  }
 
   while(1) {
     // Zero out the structs to start fresh
     memset(&sensor_data, 0, sizeof(sensor_data_struct));
     memset(&env_sensor_readings, 0, sizeof(struct bme280_data));
-    memset(&uv_readings, 0, sizeof(UV_values));
+    memset(&uv_readings, 0, sizeof(UV_converted_values));
 
     // Get BME280 readings
     return_code = env.get_readings(&env_sensor_readings);
-
     // TODO: check error code, determine some way of indicating sensor failure over the 
-
 
     // Log results
     ESP_LOGI(I2C_TAG, "Environmental sensor readings: Temp = %.3lf degC, Pres = %.3lf hPa, Rh = %.3lf %%",
@@ -298,14 +306,16 @@ void sensors_task(void* arg)
     // ...
     // Gather soil sensor readings
     // ...
-
+    return_code = uv.get_readings(&uv_readings);
+    ESP_LOGI(I2C_TAG, "UV sensor readings: UV A = %.3lf uW/cm^2, UV B = %.3lf uW/cm^2, UV C = %.3lf uW/cm^2",
+      env_sensor_readings.temperature, env_sensor_readings.pressure, env_sensor_readings.humidity);
     // Copy to sensor_data_struct
-    memcpy(&(sensor_data.uv_data), &uv_readings, sizeof(UV_values));
+    memcpy(&(sensor_data.uv_data), &uv_readings, sizeof(UV_converted_values));
 
     // Send the sensor data to the environmental_control_task
     xQueueGenericSend(sensor_queue, &sensor_data, 1, queueSEND_TO_BACK);
 
-    vTaskDelay(50);
+    vTaskDelay(1);
   }
 }
 
