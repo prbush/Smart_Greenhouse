@@ -273,22 +273,25 @@ void sensors_task(void* arg)
   ESP_ERROR_CHECK(i2c_master_init());
   ESP_LOGI(I2C_TAG, "I2C initialized successfully");
 
-  // Initialize the BME280 Environmental sensor
-  // TODO: do something with the return code, probably just reset
-  return_code = enviromental_sensor_init(&env, (((1 / portTICK_PERIOD_MS) / 25) + 1) /* 25Hz */, I2C_NUM_0);
-  // If the sensor doesn't initialize properly, resart and try again
-  if (return_code != ESP_OK) {
-    esp_restart();
-  }
-
   vTaskDelay(10);
-  return_code = uv_sensor_init(&uv, I2C_NUM_0, GAIN_32x, MS_64);
-  // return_code = uv_sensor_init(&uv, ((512 / portTICK_PERIOD_MS) + 1), I2C_NUM_0);
 
+  // Initialize the UV sensor
+  return_code = uv_sensor_init(&uv, I2C_NUM_0, GAIN_256x, MS_64);
   if (return_code != ESP_OK) {
     vTaskDelay(2000);
     esp_restart();
   }
+
+  vTaskDelay(10);
+
+  // Initialize the BME280 Environmental sensor
+  return_code = enviromental_sensor_init(&env, (((1 / portTICK_PERIOD_MS) / 25) + 1) /* 25Hz */, I2C_NUM_0);
+  if (return_code != ESP_OK) {
+    vTaskDelay(2000);
+    esp_restart();
+  }
+
+
 
   while(1) {
     // Zero out the structs to start fresh
@@ -312,14 +315,14 @@ void sensors_task(void* arg)
     // ...
     return_code = uv.get_readings(&uv_readings);
     ESP_LOGI(I2C_TAG, "UV sensor readings: UV A = %.3lf uW/cm^2, UV B = %.3lf uW/cm^2, UV C = %.3lf uW/cm^2",
-      env_sensor_readings.temperature, env_sensor_readings.pressure, env_sensor_readings.humidity);
+      uv_readings.UV_A, uv_readings.UV_B, uv_readings.UV_C);
     // Copy to sensor_data_struct
     memcpy(&(sensor_data.uv_data), &uv_readings, sizeof(UV_converted_values));
 
     // Send the sensor data to the environmental_control_task
     xQueueGenericSend(sensor_queue, &sensor_data, 1, queueSEND_TO_BACK);
 
-    vTaskDelay(1);
+    vTaskDelay(100);
   }
 }
 
@@ -392,7 +395,7 @@ Static functions
 // Initialization functions
 static void configure_led(void)
 {
-  ESP_LOGI(LED_TAG, "Example configured to blink addressable LED!");
+  ESP_LOGI(LED_TAG, "Application configured to blink addressable LED!");
   /* LED strip initialization with the GPIO and pixels number*/
   led_strip_config_t strip_config = {
       .strip_gpio_num = BLINK_GPIO,
@@ -489,7 +492,6 @@ static esp_err_t i2c_master_init(void)
 // Helper functions
 static void blink_led(uint32_t index, uint8_t red, uint8_t green, uint8_t blue, bool led_state)
 {
-  ESP_LOGI(LED_TAG, "Turning the LED %s!", led_state ? "ON" : "OFF");
   /* If the addressable LED is enabled */
   if (led_state) {
       /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */

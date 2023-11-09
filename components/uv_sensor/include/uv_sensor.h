@@ -121,6 +121,7 @@ typedef struct UV_sensor{
 
   // uint8_t   (*get_id)(void);
   void      (*reset)(void);
+  void      (*power_on)(void);
   esp_err_t (*get_readings)(UV_converted_values* return_data); 
 } UV_sensor;
 
