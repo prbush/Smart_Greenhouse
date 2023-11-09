@@ -33,9 +33,6 @@
 #define AS7331_ADDRESS  0x74
 // Default Chip ID
 #define AS7331_ID       0x21
-// Settings values
-#define GAIN_8X         0x08
-#define GAIN_2X         0x0A
 
 #define BUFFER_SIZE 128
 
@@ -48,23 +45,39 @@ typedef enum measurement_mode{
 } measurement_mode_t;
 
 // Conversion time -- all times in ms
-typedef enum creg1_time {
-  _1      = 0b0000,
-  _2      = 0b0001,
-  _4      = 0b0010,
-  _8      = 0b0011,
-  _16     = 0b0100,
-  _32     = 0b0101,
-  _64     = 0b0110,
-  _128    = 0b0111,
-  _256    = 0b1000,
-  _512    = 0b1001,
-  _1024   = 0b1010,
-  _2048   = 0b1011,
-  _4096   = 0b1100,
-  _8192   = 0b1101,
-  _16384  = 0b1110
-} creg1_time_t;
+typedef enum integration_time {
+  MS_1      = 0b0000,
+  MS_2      = 0b0001,
+  MS_4      = 0b0010,
+  MS_8      = 0b0011,
+  MS_16     = 0b0100,
+  MS_32     = 0b0101,
+  MS_64     = 0b0110,
+  MS_128    = 0b0111,
+  MS_256    = 0b1000,
+  MS_512    = 0b1001,
+  MS_1024   = 0b1010,
+  MS_2048   = 0b1011,
+  MS_4096   = 0b1100,
+  MS_8192   = 0b1101,
+  MS_16384  = 0b1110
+} integration_time_t;
+
+// Gain applied
+typedef enum as7331_gain {
+  GAIN_2048x  = 0b0000,
+  GAIN_1024x  = 0b0001,
+  GAIN_512x   = 0b0010,
+  GAIN_256x   = 0b0011,
+  GAIN_128x   = 0b0100,
+  GAIN_64x    = 0b0101,
+  GAIN_32x    = 0b0110,
+  GAIN_16x    = 0b0111,
+  GAIN_8x     = 0b1000,
+  GAIN_4x     = 0b1001,
+  GAIN_2x     = 0b1010,
+  GAIN_1x     = 0b1011
+} as7331_gain_t;
 // Optional standby bit
 typedef enum standby_bit {
   STDBY_OFF = 0,
@@ -101,7 +114,7 @@ typedef struct UV_sensor{
   uint8_t i2c_device_addr;
 
   uint8_t gain;
-  creg1_time_t conversion_time;
+  integration_time_t conversion_time;
 
   uint8_t read_buffer[BUFFER_SIZE];
   uint8_t write_buffer[BUFFER_SIZE];
@@ -111,6 +124,7 @@ typedef struct UV_sensor{
   esp_err_t (*get_readings)(UV_converted_values* return_data); 
 } UV_sensor;
 
-esp_err_t uv_sensor_init(UV_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port_t i2c_port_num);
+esp_err_t uv_sensor_init(UV_sensor *struct_ptr, i2c_port_t i2c_port_num, as7331_gain_t gain, 
+  integration_time_t time);
 
 #endif /* UV_SENSOR_H */

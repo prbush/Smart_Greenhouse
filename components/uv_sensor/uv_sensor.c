@@ -16,7 +16,7 @@ static const char *UV_TAG = "AS7331";
 static uint8_t    uv_sensor_get_id(void);
 static void       uv_sensor_get_status(void);
 static void       uv_sensor_apply_settings(measurement_mode_t mode, standby_bit_t standby, uint8_t break_time,
-                    uint8_t gain, internal_clock_t internal_clock, creg1_time_t conversion_time);
+                    as7331_gain_t gain, internal_clock_t internal_clock, integration_time_t conversion_time);
 static esp_err_t  uv_generic_i2c_write(uint8_t reg_addr, uint8_t* write_data, size_t length);
 static esp_err_t  uv_generic_i2c_read(uint8_t reg_addr, uint8_t* return_data, size_t length);
 
@@ -29,7 +29,8 @@ static esp_err_t  _uv_sensor_get_readings(UV_converted_values* return_data);
 /*!
  * Public init function
  */
-esp_err_t uv_sensor_init(UV_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port_t i2c_port_num)
+esp_err_t uv_sensor_init(UV_sensor *struct_ptr, i2c_port_t i2c_port_num, as7331_gain_t gain, 
+  integration_time_t time)
 {
   esp_err_t return_code = ESP_OK;
   uint8_t chip_id = 0;
@@ -39,12 +40,13 @@ esp_err_t uv_sensor_init(UV_sensor *struct_ptr, uint32_t timeout_ticks, i2c_port
 
   // Assign struct fields
   self->i2c_port_num = i2c_port_num;
-  self->i2c_timeout_ticks = timeout_ticks;
-  self->delay_period = 512; // required delay in ms
+  self->delay_period = (1 << time); // required delay in ms
+  self->i2c_timeout_ticks = (self->delay_period / portTICK_PERIOD_MS) + 1;
   self->i2c_device_addr = AS7331_ADDRESS;
 
-  self->gain = GAIN_8X;
-  self->conversion_time = _512;
+  // See if Gain 32x and time 6 result in the same measurements as default
+  self->gain = gain;
+  self->conversion_time = time;
   // self->get_id        = _uv_sensor_get_id;
   self->reset         = _uv_sensor_reset;
   self->get_readings  = _uv_sensor_get_readings;
@@ -86,18 +88,15 @@ static esp_err_t  _uv_sensor_get_readings(UV_converted_values* return_data)
   UV_adc_raw_values raw_counts = {0};
   UV_converted_values converted_vals;
   // sensitivities at 1.024 MHz clock -- units = uW/cm^2
-  float lsbA = 304.69f / ((float)(1 << (11 - self->gain))) / ((float)(1 << self->conversion_time)/1024.0f) / 1000.0f;
-  float lsbB = 398.44f / ((float)(1 << (11 - self->gain))) / ((float)(1 << self->conversion_time)/1024.0f) / 1000.0f;
-  float lsbC = 191.41f / ((float)(1 << (11 - self->gain))) / ((float)(1 << self->conversion_time)/1024.0f) / 1000.0f;
+  float lsb_a = 166.02; // nW/cm^2
+  float lsb_b = 184.57; // nW/cm^2
+  float lsb_c = 81.05;  // nW/cm^2
 
-  uint8_t OSR_reg_bits = 0;
-  uv_generic_i2c_read(AS7331_OSR, &OSR_reg_bits, 1);
-
-  // Set the command mode bit
-  OSR_reg_bits |= (1 << 7);
+  // Tell the sensor to start a measurement
+  uint8_t OSR_reg_bits = 0x83;
   uv_generic_i2c_write(AS7331_OSR, &OSR_reg_bits, 1);
 
-  vTaskDelay((self->delay_period / portTICK_PERIOD_MS) + 1);
+  vTaskDelay(self->i2c_timeout_ticks + 2);
 
   // Get the sensor readings. Passing AS7331_MRES1 with a larger size will cause the sensor to enumerate
   // through the next registers until recieving a stop bit
@@ -110,9 +109,9 @@ static esp_err_t  _uv_sensor_get_readings(UV_converted_values* return_data)
   memcpy(&(self->raw_counts), &raw_counts, sizeof(UV_adc_raw_values));
 
   // Convert the raw counts to measurements
-  converted_vals.UV_A = raw_counts.UV_A * lsbA;
-  converted_vals.UV_B = raw_counts.UV_B * lsbB;
-  converted_vals.UV_C = raw_counts.UV_C * lsbC;
+  converted_vals.UV_A = (raw_counts.UV_A * lsb_a) / 1000; // From nW/cm^2 to uW/cm^2
+  converted_vals.UV_B = (raw_counts.UV_B * lsb_b) / 1000;
+  converted_vals.UV_C = (raw_counts.UV_C * lsb_c) / 1000;
 
   // Copy results to internal struct storage
   memcpy(&(self->converted_vals), &converted_vals, sizeof(UV_converted_values));
@@ -169,15 +168,46 @@ static void uv_sensor_get_status(void)
  * Apply the desired settings to the chip
  */
 static void uv_sensor_apply_settings(measurement_mode_t mode, standby_bit_t standby, uint8_t break_time,
-              uint8_t gain, internal_clock_t internal_clock, creg1_time_t conversion_time)
+              as7331_gain_t gain, internal_clock_t internal_clock, integration_time_t conversion_time)
 {
   uint8_t creg1_bits = ((gain << 4) | conversion_time);
-  uint8_t creg2_bits = 0x01;
+  uint8_t creg2_bits = 0x00;
   uint8_t creg3_bits = ((mode << 6) | (standby << 4) | internal_clock);
+  uint8_t osr_bits = 0x03;
+  uint8_t validate_reg = 0;
 
+  // Coming out of reset, the sensor will be in congifuration mode
+  self->reset();
+  vTaskDelay(1);
+  // Write and verify the control registers
   uv_generic_i2c_write(AS7331_CREG1, &creg1_bits, 1);
+  uv_generic_i2c_read(AS7331_CREG1, &validate_reg, 1);
+  if (validate_reg != creg1_bits) {
+    ESP_LOGE(UV_TAG, "CREG1 register setting did not stick.");
+  }
+
+  vTaskDelay(1);
+
   uv_generic_i2c_write(AS7331_CREG2, &creg2_bits, 1);
+  uv_generic_i2c_read(AS7331_CREG2, &validate_reg, 1);
+  if (validate_reg != creg2_bits) {
+    ESP_LOGE(UV_TAG, "CREG2 register setting did not stick.");
+  }
+
+  vTaskDelay(1);
+
   uv_generic_i2c_write(AS7331_CREG3, &creg3_bits, 1);
+  uv_generic_i2c_read(AS7331_CREG3, &validate_reg, 1);
+  if (validate_reg != creg3_bits) {
+    ESP_LOGE(UV_TAG, "CREG3 register setting did not stick.");
+  }
+
+  // Set the OSR reg to be in the measurement state vs config state
+  uv_generic_i2c_write(AS7331_OSR, &osr_bits, 1);
+  uv_generic_i2c_read(AS7331_OSR, &validate_reg, 1);
+  if (validate_reg != osr_bits) {
+    ESP_LOGE(UV_TAG, "OSR register setting did not stick.");
+  }
 }
 
 /*!

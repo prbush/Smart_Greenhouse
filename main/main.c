@@ -119,7 +119,7 @@ typedef struct Firebase_data {
 #define WIFI_FAIL_BIT      BIT1
 
 // Firebase Realtime Database URL
-#define FIREBASE_URL "https://2141bacc-fef6-4411-82b6-2db68ea707ea.mock.pstmn.io/post"
+#define FIREBASE_URL "https://daily-trader-default-rtdb.firebaseio.com/apps.json"
 
 // I2C defines
 #define I2C_MASTER_SCL_IO           4       /*!< GPIO number used for I2C master clock */
@@ -213,8 +213,8 @@ void app_main(void)
   wifi_init_sta();
 
   // Create RTOS threads
-  xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
-  // xTaskCreate(led_task, "LED task", 4096, NULL, 5, &led_task_handle);
+  // xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
+  xTaskCreate(led_task, "LED task", 4096, NULL, 5, &led_task_handle);
   xTaskCreate(sensors_task, "Sensors task", 8192, NULL, 5, &sensors_task_handle);
   xTaskCreate(environmental_control_task, "Env ctrl task", 8192, NULL, 5, &environmental_control_task_handle);
 
@@ -235,9 +235,9 @@ void led_task(void* arg)
   configure_led();
 
   while (1) {
-    red = (uint8_t) (esp_random() % 256);
-    green = (uint8_t) (esp_random() % 256);
-    blue = (uint8_t) (esp_random() % 256);
+    red = (uint8_t) (esp_random() % 32);
+    green = (uint8_t) (esp_random() % 32);
+    blue = (uint8_t) (esp_random() % 32);
     blink_led(index, red, green, blue, led_state);
     led_state = !led_state;
     vTaskDelay(50);
@@ -257,8 +257,8 @@ void firebase_task(void *arg)
     // ...
 
     // Send the data to firebase
-    // fb.send_data(sample_json_string);
-    vTaskDelay(100);
+    fb.send_data(sample_json_string);
+    vTaskDelay(10000);
   }
 }
 
@@ -280,9 +280,13 @@ void sensors_task(void* arg)
   if (return_code != ESP_OK) {
     esp_restart();
   }
-  return_code = uv_sensor_init(&uv, ((512 / portTICK_PERIOD_MS) + 1), I2C_NUM_0);
+
+  vTaskDelay(10);
+  return_code = uv_sensor_init(&uv, I2C_NUM_0, GAIN_32x, MS_64);
+  // return_code = uv_sensor_init(&uv, ((512 / portTICK_PERIOD_MS) + 1), I2C_NUM_0);
 
   if (return_code != ESP_OK) {
+    vTaskDelay(2000);
     esp_restart();
   }
 
