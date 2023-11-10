@@ -1,4 +1,4 @@
-idf_component_register(SRCS "firebase.c"
-                    INCLUDE_DIRS "include"
-                    PRIV_REQUIRES esp_http_client esp-tls
+idf_component_register(SRCS "cJSON_Utils.c" "cJSON.c" "firebase.c"
+                    INCLUDE_DIRS "include" "../../main"
+                    PRIV_REQUIRES esp_http_client esp-tls driver
                     EMBED_TXTFILES certificate.pem)

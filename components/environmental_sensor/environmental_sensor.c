@@ -18,10 +18,10 @@ void                      BME280_delay_usec(uint32_t msec, void *intf_ptr);
 BME280_INTF_RET_TYPE      bme280_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length, void *intf_ptr);
 BME280_INTF_RET_TYPE      bme280_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t length, void *intf_ptr);
 
-// Helper functions
+// Private functions
 static void               bme280_error_codes_print_result(const char *bme_fn_name, int8_t rslt);
 
-// Private functions
+// Public functions
 static esp_err_t          _environmental_sensor_get_readings(struct bme280_data* return_data);
 
 

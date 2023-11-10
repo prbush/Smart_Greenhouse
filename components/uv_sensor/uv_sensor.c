@@ -12,7 +12,7 @@ static UV_sensor *self;
 // Logger tag
 static const char *UV_TAG = "AS7331";
 
-// Helper functions
+// Private functions
 static uint8_t    uv_sensor_get_id(void);
 static void       uv_sensor_get_status(void);
 static esp_err_t  uv_sensor_apply_settings(measurement_mode_t mode, standby_bit_t standby, uint8_t break_time,
@@ -20,7 +20,7 @@ static esp_err_t  uv_sensor_apply_settings(measurement_mode_t mode, standby_bit_
 static esp_err_t  uv_generic_i2c_write(uint8_t reg_addr, uint8_t* write_data, size_t length);
 static esp_err_t  uv_generic_i2c_read(uint8_t reg_addr, uint8_t* return_data, size_t length);
 
-// Private functions
+// Public functions
 static void       _uv_sensor_power_on(void);
 static void       _uv_sensor_reset(void);
 static esp_err_t  _uv_sensor_get_readings(UV_converted_values* return_data);

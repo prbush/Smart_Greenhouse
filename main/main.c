@@ -42,29 +42,6 @@
 #include "../build/config/sdkconfig.h"
 
 //
-// Structs, enums, typedefs
-typedef enum status_state {
-  OFF = 0,
-  ON = 1
-} status_state_t;
-
-typedef struct sensor_data{
-  struct bme280_data bme280_data;
-  UV_converted_values uv_data;
-} sensor_data_struct;
-
-typedef struct status_data {
-  status_state_t fan_state;
-  status_state_t lights_state;
-  status_state_t pdlc_state; 
-} status_data_struct;
-
-typedef struct Firebase_data {
-  sensor_data_struct sensor_data;
-  status_data_struct status_data;
-} firebase_data_struct;
-
-//
 // Defines
 
 /* GPIO pin assignments */
@@ -122,13 +99,14 @@ typedef struct Firebase_data {
 #define FIREBASE_URL "https://daily-trader-default-rtdb.firebaseio.com/apps.json"
 
 // I2C defines
-#define I2C_MASTER_SCL_IO           4       /*!< GPIO number used for I2C master clock */
-#define I2C_MASTER_SDA_IO           5       /*!< GPIO number used for I2C master data  */
+#define I2C_MASTER_SCL_IO           2       /*!< GPIO number used for I2C master clock */
+#define I2C_MASTER_SDA_IO           1       /*!< GPIO number used for I2C master data  */
 #define I2C_MASTER_NUM              0       /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
 #define I2C_MASTER_FREQ_HZ          400000  /*!< I2C master clock frequency */
 #define I2C_MASTER_TX_BUF_DISABLE   0       /*!< I2C master doesn't need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE   0       /*!< I2C master doesn't need buffer */
 #define I2C_MASTER_TIMEOUT_MS       2500
+
 
 
 //
@@ -213,7 +191,7 @@ void app_main(void)
   wifi_init_sta();
 
   // Create RTOS threads
-  // xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
+  xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
   xTaskCreate(led_task, "LED task", 4096, NULL, 5, &led_task_handle);
   xTaskCreate(sensors_task, "Sensors task", 8192, NULL, 5, &sensors_task_handle);
   xTaskCreate(environmental_control_task, "Env ctrl task", 8192, NULL, 5, &environmental_control_task_handle);
@@ -235,9 +213,9 @@ void led_task(void* arg)
   configure_led();
 
   while (1) {
-    red = (uint8_t) (esp_random() % 32);
-    green = (uint8_t) (esp_random() % 32);
-    blue = (uint8_t) (esp_random() % 32);
+    red = (uint8_t) (esp_random() % 24);
+    green = (uint8_t) (esp_random() % 24);
+    blue = (uint8_t) (esp_random() % 24);
     blink_led(index, red, green, blue, led_state);
     led_state = !led_state;
     vTaskDelay(50);
@@ -251,14 +229,13 @@ void firebase_task(void *arg)
   firebase_init(&fb, FIREBASE_URL, &firebase_queue);
   while(1) {
     // Wait until we get a message from the enviromental control task
-    xQueueReceive(firebase_queue, &firebase_data, (2500 / portTICK_PERIOD_MS));
+    xQueueReceive(firebase_queue, &firebase_data, portMAX_DELAY);
 
     // Assemble a JSON string with the firebase data
     // ...
 
     // Send the data to firebase
-    fb.send_data(sample_json_string);
-    vTaskDelay(10000);
+    fb.send_data(&firebase_data);
   }
 }
 
@@ -322,7 +299,7 @@ void sensors_task(void* arg)
     // Send the sensor data to the environmental_control_task
     xQueueGenericSend(sensor_queue, &sensor_data, 1, queueSEND_TO_BACK);
 
-    vTaskDelay(100);
+    vTaskDelay(1000);
   }
 }
 
@@ -335,7 +312,7 @@ void environmental_control_task(void *arg)
   while(1) {
 
     // Wait until we get a message with sensor data
-    xQueueReceive(sensor_queue, &sensor_data, (2500 / portTICK_PERIOD_MS));
+    xQueueReceive(sensor_queue, &sensor_data, portMAX_DELAY);
     // Check for an empty message
 
     // Make enviromental changes (fan, pdlc, lights) as needed based on sensor data and set thresholds
@@ -350,8 +327,6 @@ void environmental_control_task(void *arg)
 
     // Send the message to the firebase task
     xQueueSend(firebase_queue, &firebase_data, 1);
-
-    vTaskDelay(50);
 
   }
 }
