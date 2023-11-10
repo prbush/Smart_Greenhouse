@@ -150,6 +150,10 @@ static char* assemble_json_string(firebase_data_struct *data)
   sensor = cJSON_CreateObject();
   cJSON_AddNumberToObject(sensor, "UV C", data->sensor_data.uv_data.UV_C);
   cJSON_AddItemToArray(sensors, sensor);
+  // Soil sensor
+  sensor = cJSON_CreateObject();
+  cJSON_AddNumberToObject(sensor, "Soil", data->sensor_data.soil_wetness);
+  cJSON_AddItemToArray(sensors, sensor);
 
   // Now on to the statuses array
   statuses = cJSON_AddArrayToObject(json, "Status");

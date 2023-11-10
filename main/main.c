@@ -156,6 +156,7 @@ static int s_retry_num = 0;
 Firebase fb;
 Environmental_sensor env;
 UV_sensor uv;
+Soil_sensor soil;
 
 /*
 
@@ -268,7 +269,8 @@ void sensors_task(void* arg)
     esp_restart();
   }
 
-
+  // Initialize the soil sensor
+  return_code = soil_sensor_init(&soil, ADC_CHANNEL_3, ADC_ATTEN_DB_11);
 
   while(1) {
     // Zero out the structs to start fresh

@@ -15,8 +15,9 @@ typedef enum status_state {
 } status_state_t;
 
 typedef struct sensor_data{
-  struct bme280_data bme280_data;
+  struct bme280_data  bme280_data;
   UV_converted_values uv_data;
+  uint16_t            soil_wetness;
 } sensor_data_struct;
 
 typedef struct status_data {

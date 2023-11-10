@@ -23,7 +23,8 @@
     "sdkconfig.h": "c",
     "array": "c",
     "string": "c",
-    "string_view": "c"
+    "string_view": "c",
+    "adc_oneshot.h": "c"
   },
   "idf.flashType": "UART"
 }
