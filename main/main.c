@@ -99,8 +99,8 @@
 #define FIREBASE_URL "https://daily-trader-default-rtdb.firebaseio.com/apps.json"
 
 // I2C defines
-#define I2C_MASTER_SCL_IO           2       /*!< GPIO number used for I2C master clock */
-#define I2C_MASTER_SDA_IO           1       /*!< GPIO number used for I2C master data  */
+#define I2C_MASTER_SCL_IO           1       /*!< GPIO number used for I2C master clock */
+#define I2C_MASTER_SDA_IO           2       /*!< GPIO number used for I2C master data  */
 #define I2C_MASTER_NUM              0       /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
 #define I2C_MASTER_FREQ_HZ          400000  /*!< I2C master clock frequency */
 #define I2C_MASTER_TX_BUF_DISABLE   0       /*!< I2C master doesn't need buffer */
@@ -270,7 +270,7 @@ void sensors_task(void* arg)
   }
 
   // Initialize the soil sensor
-  return_code = soil_sensor_init(&soil, ADC_CHANNEL_3, ADC_ATTEN_DB_11);
+  // return_code = soil_sensor_init(&soil, ADC_CHANNEL_3, ADC_ATTEN_DB_11);
 
   while(1) {
     // Zero out the structs to start fresh
