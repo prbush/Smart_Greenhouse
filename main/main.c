@@ -9,6 +9,7 @@
 /* C std libs */
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -32,11 +33,12 @@
 
 /* Custom components */
 #include "environmental_sensor.h"
-#include "fan.h"
 #include "firebase.h"
-#include "lights.h"
 #include "soil_sensor.h"
 #include "uv_sensor.h"
+#include "fan.h"
+#include "lights.h"
+#include "pdlc.h"
 
 /* Configuration items from menuconfig tool */
 #include "../build/config/sdkconfig.h"
@@ -44,8 +46,11 @@
 //
 // Defines
 
-/* GPIO pin assignments */
-#define BLINK_GPIO 48
+// /* GPIO pin assignments */
+#define ONBOARD_RGB_LED   CONFIG_BLINK_GPIO
+#define FAN_GPIO          CONFIG_FAN_GPIO
+#define LIGHTS_GPIO       CONFIG_LIGHTS_GPIO
+#define PDLC_GPIO         CONFIG_PDLC_GPIO
 
 /* WiFi settings */
 // TODO: remove unnecessary definitions and preprocessor commands
@@ -144,6 +149,7 @@ static QueueHandle_t env_ctrl_queue;
 static const char *WIFI_TAG = "WIFI";
 static const char *LED_TAG = "LED";
 static const char *SENSOR_TAG = "SENSOR";
+static const char *ENV_CONTROL = "Environmental Control";
 // Testing JSON string
 char * sample_json_string = "{\"Temp\":\"50\",\"Pressure\":\"90\",\"Humidity\":\"55\",\"UV A\":\"300\",\"UV B\":\"250\",\"UV C\":\"125\",\"Soil sensor\":\"1300\"}";
 
@@ -159,7 +165,7 @@ UV_sensor uv;
 Soil_sensor soil;
 Fan fan;
 Lights lights;
-
+PDLC pdlc;
 /*
 
 App entry point
@@ -199,7 +205,7 @@ void app_main(void)
   xTaskCreate(sensors_task, "Sensors task", 8192, NULL, 5, &sensors_task_handle);
   xTaskCreate(environmental_control_task, "Env ctrl task", 8192, NULL, 5, &environmental_control_task_handle);
 
-  // This "main" task will be deleted after returning
+  // This "main" FreeRTOS task will be deleted after returning and control will be with the scheduler
 }
 
 
@@ -238,7 +244,7 @@ void firebase_task(void *arg)
     // ...
 
     // Send the data to firebase
-    // fb.send_data(&firebase_data);
+    fb.send_data(&firebase_data);
   }
 }
 
@@ -309,7 +315,7 @@ void sensors_task(void* arg)
     // Send the sensor data to the environmental_control_task
     xQueueGenericSend(sensor_queue, &sensor_data, 1, queueSEND_TO_BACK);
 
-    vTaskDelay(50);
+    vTaskDelay(1000);
   }
 }
 
@@ -317,13 +323,19 @@ void environmental_control_task(void *arg)
 {
   // Testing counter
   uint32_t toggle = 0;
-  esp_err_t return_code;
+  bool lights_on = false;
+  bool fan_on = false;
+  bool pdlc_on = false;
+
+
+  esp_err_t return_code = ESP_FAIL;
   sensor_data_struct sensor_data = {0};
   status_data_struct status_data = {0};
   firebase_data_struct firebase_data = {0};
 
-  return_code = fan_init(&fan, GPIO_NUM_18);
-  return_code = lights_init(&lights, GPIO_NUM_15);
+  return_code = fan_init(&fan, FAN_GPIO);
+  return_code = lights_init(&lights, LIGHTS_GPIO);
+  return_code = pdlc_init(&pdlc, PDLC_GPIO);
 
   while(1) {
 
@@ -333,17 +345,35 @@ void environmental_control_task(void *arg)
 
     // Make enviromental changes (fan, pdlc, lights) as needed based on sensor data and set thresholds
     // ...
-    if (toggle++ % 5 == 0) {
-      fan.on();
-    } else {
-      fan.off();
+
+    if (toggle % 5 == 0) {
+      fan_on = !fan_on;
+      if (!fan_on) {
+        fan.off();
+      } else {
+        fan.on();
+      }
     }
 
-    if (toggle % 6 == 0) {
-      lights.on();
-    } else {
-      lights.off();
+    if (toggle % 7 == 0) {
+      lights_on = !lights_on;
+      if (!lights_on) {
+        lights.off();
+      } else {
+        lights.on();
+      }
     }
+
+    if (toggle % 9 == 0) {
+      pdlc_on = !pdlc_on;
+      if (!pdlc_on) {
+        pdlc.off();
+      } else {
+        pdlc.on();
+      }
+    }
+
+    toggle ++;
     
     // Gather statuses of the fan, pdlc, lights
     // ...
@@ -400,7 +430,7 @@ static void configure_led(void)
   ESP_LOGI(LED_TAG, "Application configured to blink addressable LED!");
   /* LED strip initialization with the GPIO and pixels number*/
   led_strip_config_t strip_config = {
-      .strip_gpio_num = BLINK_GPIO,
+      .strip_gpio_num = ONBOARD_RGB_LED,
       .max_leds = 1, // at least one LED on board
   };
   led_strip_rmt_config_t rmt_config = {

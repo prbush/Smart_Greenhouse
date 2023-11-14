@@ -13,7 +13,7 @@
     },
     "env": {},
     "flashBaudRate": "",
-    "idfTarget": "",
+    "idfTarget": "esp32s3",
     "monitorBaudRate": "",
     "openOCD": {
       "debugLevel": 1,

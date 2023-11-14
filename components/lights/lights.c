@@ -20,7 +20,7 @@ static light_state_t _lights_get_state(void);
 
 esp_err_t lights_init(Lights* struct_ptr, gpio_num_t gpio_pin)
 {
-  esp_err_t return_code;
+  esp_err_t return_code = ESP_OK;
 
   // Assign struct fields
   self = struct_ptr;
@@ -34,7 +34,7 @@ esp_err_t lights_init(Lights* struct_ptr, gpio_num_t gpio_pin)
   // Set as output mode
   self->fet_gpio_config.mode = GPIO_MODE_OUTPUT;
   // Bit mask of the pin to be set
-  self->fet_gpio_config.pin_bit_mask = (1 << gpio_pin);
+  self->fet_gpio_config.pin_bit_mask = (((uint64_t)1) << ((uint64_t)gpio_pin));
   // Disable pull-down mode
   self->fet_gpio_config.pull_down_en = 0;
   // Disable pull-up mode
@@ -43,7 +43,7 @@ esp_err_t lights_init(Lights* struct_ptr, gpio_num_t gpio_pin)
   return_code = gpio_config(&(self->fet_gpio_config));
 
   if (return_code != ESP_OK) {
-    ESP_LOGE(LIGHT_TAG, "Failed to configure FAN GPIO pin.");
+    ESP_LOGE(LIGHT_TAG, "Failed to configure Lights GPIO pin.");
   }
 
   // Set the initial state to off
