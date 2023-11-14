@@ -1,8 +1,10 @@
 #include <stdio.h>
+#include "soc/soc_caps.h"
 #include "esp_err.h"
 #include "esp_log.h"
-#include "driver/adc.h"
-#include "esp_adc_cal.h"
+#include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 #include "soil_sensor.h"
 
 // Static private object pointer
@@ -12,48 +14,62 @@ static Soil_sensor *self;
 const char *SOIL_TAG = "Soil Sensor";
 
 // Private functions
-static bool adc_calibration_init(void);
+static esp_err_t adc_calibration_init(void);
 
-// Public functions
+// Public functions privided via struct fn pointers
 static uint16_t _soil_sensor_get_readings(void);
 
 /*!
  * Public init function
  */
-esp_err_t soil_sensor_init(Soil_sensor *struct_ptr, adc_channel_t adc_channel, adc_atten_t atten,
-  uint32_t soil_dry_value, uint32_t soil_saturated_value)
+esp_err_t soil_sensor_init(Soil_sensor *struct_ptr, adc_unit_t adc_unit, adc_channel_t adc_channel, 
+  adc_atten_t atten)
 {
   esp_err_t return_code;
-  bool is_calibrated = false;
+  adc_oneshot_unit_init_cfg_t init_config;
+  adc_oneshot_chan_cfg_t channel_config;
 
   // Assign private object pointer 
   self = struct_ptr;
 
   // Assign struct fields
-  // ...
+  self->init_config.clk_src = 0;   // Use default clock source
+  self->init_config.ulp_mode = ADC_ULP_MODE_DISABLE;
+  self->init_config.unit_id = adc_unit;
+  self->channel_config.atten = atten;
+  self->channel_config.bitwidth = ADC_BITWIDTH_12;
   self->adc_channel = adc_channel;
-  self->attenuation = atten;
-  self->adc_bitwidth = ADC_BITWIDTH_12;
+  // Function pointer
   self->get_reading = _soil_sensor_get_readings;
-  // TODO: Identify the soil min and max values
-  self->soil_min_val = soil_dry_value;
-  self->soil_max_val = soil_saturated_value;
+  // Tested min/max values
+  self->soil_min_val = SOIL_DRY_COUNTS;
+  self->soil_max_val = SOIL_SATURATED_COUNTS;
 
-  // Calibrate for the offset to Vref written to the eFuse
-  is_calibrated = adc_calibration_init();
-
-  return_code = adc1_config_width(self->adc_bitwidth);
-
+  // Set up the ADC unit as one-shot
+  return_code = adc_oneshot_new_unit(&(self->init_config), &(self->adc_handle));
   if (return_code != ESP_OK) {
     ESP_LOGE(SOIL_TAG, "Failed to configure soil sensor ADC channel bit width.");
     return return_code;
   }
   
-  return_code = adc1_config_channel_atten(self->adc_channel, self->attenuation);
-  
+  // Set up the ADC channel
+  return_code = adc_oneshot_config_channel(self->adc_handle, self->adc_channel, 
+                  &(self->channel_config));
   if (return_code != ESP_OK) {
     ESP_LOGE(SOIL_TAG, "Failed to configure soil sensor ADC channel attenuation.");
     return return_code;
+  }
+
+  // Calibrate for the offset to Vref written to the eFuse
+  return_code = adc_calibration_init();
+  if (return_code == ESP_OK) {
+      ESP_LOGI(SOIL_TAG, "ADC calibration success");
+  } else if (return_code == ESP_ERR_NOT_SUPPORTED || !self->is_calibrated) {
+      ESP_LOGW(SOIL_TAG, "ADC eFuse not burnt, skip software calibration");
+      return return_code;
+  } else {
+      ESP_LOGE(SOIL_TAG, "Invalid arg or no memory in soil_sensor_init()");
+      return return_code;
   }
 
   return return_code;
@@ -67,7 +83,9 @@ static uint16_t _soil_sensor_get_readings(void)
 {
   int adc_raw_count = 0;
 
-  adc_raw_count = (self->adc_channel);
+  adc_oneshot_read(self->adc_handle, self->adc_channel, &adc_raw_count);
+
+  // TODO: map the raw counts to 0-100%
 
   return (uint16_t) adc_raw_count;
 }
@@ -76,24 +94,43 @@ static uint16_t _soil_sensor_get_readings(void)
 /*!
  * Calibrate the ADC
  */
-static bool adc_calibration_init(void)
+static esp_err_t adc_calibration_init(void)
 {
-    esp_err_t ret;
-    bool cali_enable = false;
+  esp_err_t return_code = ESP_FAIL;
+  // We'll use line fitting as our measurements are linear
+  // This is a throw away struct
+  adc_cali_line_fitting_config_t cali_config;
 
-    ret = esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP_FIT);
-    if (ret == ESP_ERR_NOT_SUPPORTED) {
-        ESP_LOGW(SOIL_TAG, "Calibration scheme not supported, skip software"
-          "calibration");
-    } else if (ret == ESP_ERR_INVALID_VERSION) {
-        ESP_LOGW(SOIL_TAG, "eFuse not burnt, skip software calibration");
-    } else if (ret == ESP_OK) {
-        cali_enable = true;
-        esp_adc_cal_characterize(ADC_UNIT_1, self->attenuation, 
-          self->adc_bitwidth, 0, &(self->cal));
-    } else {
-        ESP_LOGE(SOIL_TAG, "Invalid arg");
+  // Only calibrate once
+  if (!self->is_calibrated) {
+    cali_config.unit_id = self->init_config.unit_id;
+    cali_config.atten = self->channel_config.atten;
+    cali_config.bitwidth = self->channel_config.bitwidth;
+    // Second arg is return parameter -- self->calibration_handle will be written to
+    return_code = adc_cali_create_scheme_line_fitting(&cali_config, &(self->calibration_handle));
+    
+    if (return_code == ESP_OK) {
+      self->is_calibrated = true;
     }
+  }
 
-    return cali_enable;
+  return return_code;
+    // esp_err_t ret;
+    // bool cali_enable = false;
+
+    // ret = esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP_FIT);
+    // if (ret == ESP_ERR_NOT_SUPPORTED) {
+    //     ESP_LOGW(SOIL_TAG, "Calibration scheme not supported, skip software"
+    //       "calibration");
+    // } else if (ret == ESP_ERR_INVALID_VERSION) {
+    //     ESP_LOGW(SOIL_TAG, "eFuse not burnt, skip software calibration");
+    // } else if (ret == ESP_OK) {
+    //     cali_enable = true;
+    //     esp_adc_cal_characterize(ADC_UNIT_1, self->attenuation, 
+    //       self->adc_bitwidth, 0, &(self->cal));
+    // } else {
+    //     ESP_LOGE(SOIL_TAG, "Invalid arg");
+    // }
+
+    // return cali_enable;
 }

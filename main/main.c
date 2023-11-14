@@ -270,7 +270,12 @@ void sensors_task(void* arg)
   }
 
   // Initialize the soil sensor
-  // return_code = soil_sensor_init(&soil, ADC_CHANNEL_3, ADC_ATTEN_DB_11);
+  // TODO: identify the soil dry/wet vals and put them here
+  return_code = soil_sensor_init(&soil, ADC_UNIT_1, ADC_CHANNEL_7, ADC_ATTEN_DB_11);
+  if (return_code != ESP_OK) {
+    vTaskDelay(2000);
+    esp_restart();
+  }
 
   while(1) {
     // Zero out the structs to start fresh
