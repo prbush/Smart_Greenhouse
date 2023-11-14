@@ -26,8 +26,6 @@ esp_err_t soil_sensor_init(Soil_sensor *struct_ptr, adc_unit_t adc_unit, adc_cha
   adc_atten_t atten)
 {
   esp_err_t return_code;
-  adc_oneshot_unit_init_cfg_t init_config;
-  adc_oneshot_chan_cfg_t channel_config;
 
   // Assign private object pointer 
   self = struct_ptr;
@@ -83,7 +81,8 @@ static uint16_t _soil_sensor_get_readings(void)
 {
   int adc_raw_count = 0;
 
-  adc_oneshot_read(self->adc_handle, self->adc_channel, &adc_raw_count);
+  adc_oneshot_get_calibrated_result(self->adc_handle, self->calibration_handle, self->adc_channel,
+    &adc_raw_count);
 
   // TODO: map the raw counts to 0-100%
 
@@ -97,17 +96,17 @@ static uint16_t _soil_sensor_get_readings(void)
 static esp_err_t adc_calibration_init(void)
 {
   esp_err_t return_code = ESP_FAIL;
-  // We'll use line fitting as our measurements are linear
-  // This is a throw away struct
-  adc_cali_line_fitting_config_t cali_config;
+  // We'll use curve fitting as it is more accurate and supported by our chip
+  adc_cali_curve_fitting_config_t cali_config;   // This is a throw away struct
 
   // Only calibrate once
   if (!self->is_calibrated) {
     cali_config.unit_id = self->init_config.unit_id;
+    cali_config.chan = self->adc_channel;
     cali_config.atten = self->channel_config.atten;
     cali_config.bitwidth = self->channel_config.bitwidth;
     // Second arg is return parameter -- self->calibration_handle will be written to
-    return_code = adc_cali_create_scheme_line_fitting(&cali_config, &(self->calibration_handle));
+    return_code = adc_cali_create_scheme_curve_fitting(&cali_config, &(self->calibration_handle));
     
     if (return_code == ESP_OK) {
       self->is_calibrated = true;
@@ -115,22 +114,4 @@ static esp_err_t adc_calibration_init(void)
   }
 
   return return_code;
-    // esp_err_t ret;
-    // bool cali_enable = false;
-
-    // ret = esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP_FIT);
-    // if (ret == ESP_ERR_NOT_SUPPORTED) {
-    //     ESP_LOGW(SOIL_TAG, "Calibration scheme not supported, skip software"
-    //       "calibration");
-    // } else if (ret == ESP_ERR_INVALID_VERSION) {
-    //     ESP_LOGW(SOIL_TAG, "eFuse not burnt, skip software calibration");
-    // } else if (ret == ESP_OK) {
-    //     cali_enable = true;
-    //     esp_adc_cal_characterize(ADC_UNIT_1, self->attenuation, 
-    //       self->adc_bitwidth, 0, &(self->cal));
-    // } else {
-    //     ESP_LOGE(SOIL_TAG, "Invalid arg");
-    // }
-
-    // return cali_enable;
 }

@@ -4,12 +4,11 @@
 #include "esp_err.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
-#include "esp_adc/adc_cali_scheme.h"
 
 /* Measured values for min/max ADC counts
  * Note that we are reading the capacitance of the soil,
  * which will be higher in dry soil vs wet. */ 
-#define OPEN_AIR_COUNTS       550
+#define OPEN_AIR_COUNTS       2725
 #define IN_WATER_COUNTS       100
 #define SOIL_DRY_COUNTS       400
 #define SOIL_SATURATED_COUNTS 250

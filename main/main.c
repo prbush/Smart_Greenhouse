@@ -143,7 +143,7 @@ static QueueHandle_t env_ctrl_queue;
 /* Const strings */
 static const char *WIFI_TAG = "WIFI";
 static const char *LED_TAG = "LED";
-static const char *I2C_TAG = "I2C";
+static const char *SENSOR_TAG = "SENSOR";
 // Testing JSON string
 char * sample_json_string = "{\"Temp\":\"50\",\"Pressure\":\"90\",\"Humidity\":\"55\",\"UV A\":\"300\",\"UV B\":\"250\",\"UV C\":\"125\",\"Soil sensor\":\"1300\"}";
 
@@ -157,6 +157,7 @@ Firebase fb;
 Environmental_sensor env;
 UV_sensor uv;
 Soil_sensor soil;
+Fan fan;
 
 /*
 
@@ -236,7 +237,7 @@ void firebase_task(void *arg)
     // ...
 
     // Send the data to firebase
-    fb.send_data(&firebase_data);
+    // fb.send_data(&firebase_data);
   }
 }
 
@@ -249,7 +250,7 @@ void sensors_task(void* arg)
 
   // Initialize I2C as master
   ESP_ERROR_CHECK(i2c_master_init());
-  ESP_LOGI(I2C_TAG, "I2C initialized successfully");
+  ESP_LOGI(SENSOR_TAG, "I2C initialized successfully");
 
   vTaskDelay(10);
 
@@ -285,36 +286,42 @@ void sensors_task(void* arg)
 
     // Get BME280 readings
     return_code = env.get_readings(&env_sensor_readings);
-    // TODO: check error code, determine some way of indicating sensor failure over the 
 
     // Log results
-    ESP_LOGI(I2C_TAG, "Environmental sensor readings: Temp = %.3lf degC, Pres = %.3lf hPa, Rh = %.3lf %%",
+    ESP_LOGI(SENSOR_TAG, "Environmental sensor readings: Temp = %.3lf degC, Pres = %.3lf hPa, Rh = %.3lf %%",
       env_sensor_readings.temperature, env_sensor_readings.pressure, env_sensor_readings.humidity);
     // Copy to sensor_data_struct
     memcpy(&(sensor_data.bme280_data), &env_sensor_readings, sizeof(struct bme280_data));
 
     // Gather UV sensor readings
-    // ...
-    // Gather soil sensor readings
-    // ...
     return_code = uv.get_readings(&uv_readings);
-    ESP_LOGI(I2C_TAG, "UV sensor readings: UV A = %.3lf uW/cm^2, UV B = %.3lf uW/cm^2, UV C = %.3lf uW/cm^2",
+    ESP_LOGI(SENSOR_TAG, "UV sensor readings: UV A = %.3lf uW/cm^2, UV B = %.3lf uW/cm^2, UV C = %.3lf uW/cm^2",
       uv_readings.UV_A, uv_readings.UV_B, uv_readings.UV_C);
     // Copy to sensor_data_struct
     memcpy(&(sensor_data.uv_data), &uv_readings, sizeof(UV_converted_values));
 
+    // Gather soil sensor readings
+    sensor_data.soil_wetness = soil.get_reading();
+    ESP_LOGI(SENSOR_TAG, "Soil sensor reading: %u", sensor_data.soil_wetness);
+
+
     // Send the sensor data to the environmental_control_task
     xQueueGenericSend(sensor_queue, &sensor_data, 1, queueSEND_TO_BACK);
 
-    vTaskDelay(1000);
+    vTaskDelay(50);
   }
 }
 
 void environmental_control_task(void *arg)
 {
+  // Testing counter
+  uint32_t toggle = 0;
+  esp_err_t return_code;
   sensor_data_struct sensor_data = {0};
   status_data_struct status_data = {0};
   firebase_data_struct firebase_data = {0};
+
+  return_code = fan_init(&fan, GPIO_NUM_18);
 
   while(1) {
 
@@ -324,6 +331,11 @@ void environmental_control_task(void *arg)
 
     // Make enviromental changes (fan, pdlc, lights) as needed based on sensor data and set thresholds
     // ...
+    if (toggle++ % 2 == 0) {
+      fan.on();
+    } else {
+      fan.off();
+    }
     
     // Gather statuses of the fan, pdlc, lights
     // ...
