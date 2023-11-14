@@ -158,6 +158,7 @@ Environmental_sensor env;
 UV_sensor uv;
 Soil_sensor soil;
 Fan fan;
+Lights lights;
 
 /*
 
@@ -322,6 +323,7 @@ void environmental_control_task(void *arg)
   firebase_data_struct firebase_data = {0};
 
   return_code = fan_init(&fan, GPIO_NUM_18);
+  return_code = lights_init(&lights, GPIO_NUM_15);
 
   while(1) {
 
@@ -331,10 +333,16 @@ void environmental_control_task(void *arg)
 
     // Make enviromental changes (fan, pdlc, lights) as needed based on sensor data and set thresholds
     // ...
-    if (toggle++ % 2 == 0) {
+    if (toggle++ % 5 == 0) {
       fan.on();
     } else {
       fan.off();
+    }
+
+    if (toggle % 6 == 0) {
+      lights.on();
+    } else {
+      lights.off();
     }
     
     // Gather statuses of the fan, pdlc, lights

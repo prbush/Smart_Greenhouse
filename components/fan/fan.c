@@ -29,8 +29,6 @@ esp_err_t fan_init(Fan* struct_ptr, gpio_num_t gpio_pin)
   self->off = _fan_off;
   self->get_state = _fan_get_state;
 
-  // Zero-initialize the config structure.
-  // self->fet_gpio_config = {};
   // Disable interrupt
   self->fet_gpio_config.intr_type = GPIO_INTR_DISABLE;
   // Set as output mode
@@ -58,7 +56,7 @@ static void _fan_on(void)
 {
   gpio_set_level(self->gpio_pin_num, (uint32_t)FAN_ON);
 
-  ESP_LOGE(FAN_TAG, "Fan on.");
+  ESP_LOGI(FAN_TAG, "Fan on.");
 
   self->current_state = FAN_ON;
 }
@@ -67,7 +65,7 @@ static void _fan_off(void)
 {
   gpio_set_level(self->gpio_pin_num, (uint32_t)FAN_OFF);
 
-  ESP_LOGE(FAN_TAG, "Fan off.");
+  ESP_LOGI(FAN_TAG, "Fan off.");
 
   self->current_state = FAN_OFF;
 }

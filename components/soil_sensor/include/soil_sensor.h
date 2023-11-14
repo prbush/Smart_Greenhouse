@@ -18,11 +18,7 @@ typedef struct Soil_sensor {
   adc_oneshot_unit_init_cfg_t init_config;
   adc_oneshot_chan_cfg_t      channel_config;
   adc_cali_handle_t           calibration_handle;
-  // adc_unit_t                  adc_unit;     // ADC_UNIT_1
   adc_channel_t               adc_channel;  // ADC_CHANNEL_7
-  // adc_atten_t                 attenuation;  // ADC_ATTEN_DB_11
-  // adc_bitwidth_t              adc_bitwidth; // 12 bits
-
 
   uint32_t              soil_min_val;
   uint32_t              soil_max_val;
