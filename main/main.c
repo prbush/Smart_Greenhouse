@@ -12,6 +12,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
+#include <sys/time.h>
 
 /* FreeRTOS components */
 #include "freertos/FreeRTOS.h"
@@ -25,11 +27,15 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "nvs_flash.h"
+#include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "led_strip.h"
 #include "driver/gpio.h"
 #include "driver/i2c.h"
+#include "esp_netif_sntp.h"
+#include "lwip/ip_addr.h"
+#include "esp_sntp.h"
 
 /* Custom components */
 #include "environmental_sensor.h"
