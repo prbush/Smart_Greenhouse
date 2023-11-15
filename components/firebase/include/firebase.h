@@ -3,9 +3,11 @@
 
 #include <esp_err.h>
 #include <freertos/queue.h>
+#include "environmental_sensor.h"
+#include "uv_sensor.h"
 
-#include "../../environmental_sensor/include/environmental_sensor.h"
-#include "../../uv_sensor/include/uv_sensor.h"
+// #include "../../environmental_sensor/include/environmental_sensor.h"
+// #include "../../uv_sensor/include/uv_sensor.h"
 
 //
 // Structs, enums, typedefs

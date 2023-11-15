@@ -109,6 +109,12 @@
 // Firebase Realtime Database URL
 #define FIREBASE_URL "https://daily-trader-default-rtdb.firebaseio.com/apps.json"
 
+// SNTP defines
+// #ifndef INET6_ADDRSTRLEN
+// #define INET6_ADDRSTRLEN 48
+// #endif
+
+
 // I2C defines
 #define I2C_MASTER_SCL_IO           1       /*!< GPIO number used for I2C master clock */
 #define I2C_MASTER_SDA_IO           2       /*!< GPIO number used for I2C master data  */
@@ -136,6 +142,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data);
 static void wifi_init_sta(void);
 static esp_err_t i2c_master_init(void);
+static void obtain_time(void);
+static void time_sync_notification_cb(struct timeval *tv);
+
 
 //
 // Variables
@@ -154,8 +163,9 @@ static QueueHandle_t env_ctrl_queue;
 /* Const strings */
 static const char *WIFI_TAG = "WIFI";
 static const char *LED_TAG = "LED";
-static const char *SENSOR_TAG = "SENSOR";
-static const char *ENV_CONTROL = "Environmental Control";
+static const char *SENSOR_TAG = "Sensor task";
+static const char *ENV_CONTROL = "Environmental Control task";
+static const char *SNTP_TAG = "SNTP";
 // Testing JSON string
 char * sample_json_string = "{\"Temp\":\"50\",\"Pressure\":\"90\",\"Humidity\":\"55\",\"UV A\":\"300\",\"UV B\":\"250\",\"UV C\":\"125\",\"Soil sensor\":\"1300\"}";
 
@@ -163,6 +173,8 @@ char * sample_json_string = "{\"Temp\":\"50\",\"Pressure\":\"90\",\"Humidity\":\
 static led_strip_handle_t led_strip;
 static uint8_t red, green, blue;
 static int s_retry_num = 0;
+time_t now;
+struct tm timeinfo;
 
 /* Passable Objects */
 Firebase fb;
@@ -204,6 +216,20 @@ void app_main(void)
   ESP_LOGI(WIFI_TAG, "ESP_WIFI_MODE_STA");
   // Connect to WiFi
   wifi_init_sta();
+
+  // Check the time and set via NTP if needed
+  // Get current time and local time
+  time(&now);
+  localtime_r(&now, &timeinfo);
+
+  // Is time set? If not, tm_year will be (1970 - 1900).
+  if (timeinfo.tm_year < (2016 - 1900)) {
+    ESP_LOGI(SNTP_TAG, "Time is not set yet. Connecting to WiFi and getting time over NTP.");
+    obtain_time();
+    // update 'now' and 'timeinfo' variable with current time and local time
+    time(&now);
+    localtime_r(&now, &timeinfo);
+  }
 
   // Create RTOS threads
   xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
@@ -250,7 +276,7 @@ void firebase_task(void *arg)
     // ...
 
     // Send the data to firebase
-    fb.send_data(&firebase_data);
+    // fb.send_data(&firebase_data);
   }
 }
 
@@ -540,4 +566,47 @@ static void blink_led(uint32_t index, uint8_t red, uint8_t green, uint8_t blue, 
       /* Set all LED off to clear all pixels */
       led_strip_clear(led_strip);
   }
+}
+
+
+void time_sync_notification_cb(struct timeval *tv)
+{
+  // Just prints a message that time sync has occured
+  ESP_LOGI(SNTP_TAG, "Notification of a time synchronization event");
+}
+
+
+static void obtain_time(void)
+{
+  int retry = 0;
+  const int retry_count = 15;
+  char strftime_buf[64];
+
+  ESP_LOGI(SNTP_TAG, "Initializing and starting SNTP");
+
+  // Will get the time and sync once an hour.
+  esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG(CONFIG_SNTP_TIME_SERVER);
+  config.sync_cb = time_sync_notification_cb; // Just a notification callback
+
+  esp_netif_sntp_init(&config);
+
+  // wait for time to be set
+  while (esp_netif_sntp_sync_wait(2000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && ++retry < retry_count) {
+    ESP_LOGI(SNTP_TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+  }
+
+  if (retry < retry_count) {
+    ESP_LOGI(SNTP_TAG, "Time successfully synced.");
+  } else {
+    ESP_LOGI(SNTP_TAG, "Time sync unsuccessful. System time is not set.");
+  }
+
+  // Set timezone to Pacific Standard Time and print local time
+  // setenv("TZ", "EST5EDT,M3.2.0/2,M11.1.0", 1);
+  setenv("TZ", "PST8PDT,M3.2.0,M11.1.0", 1); // America/Los_Angles TZ string
+  tzset();
+  time(&now);
+  localtime_r(&now, &timeinfo);
+  strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+  ESP_LOGI(SNTP_TAG, "The current date/time is: %s", strftime_buf);
 }
