@@ -3,30 +3,31 @@
 
 #include <esp_err.h>
 #include <freertos/queue.h>
-#include "environmental_sensor.h"
-#include "uv_sensor.h"
+#include "environmental_control.h"
+// #include "environmental_sensor.h"
+// #include "uv_sensor.h"
 
 // #include "../../environmental_sensor/include/environmental_sensor.h"
 // #include "../../uv_sensor/include/uv_sensor.h"
 
 //
 // Structs, enums, typedefs
-typedef enum status_state {
-  OFF = 0,
-  ON = 1
-} status_state_t;
+// typedef enum status_state {
+//   OFF = 0,
+//   ON = 1
+// } status_state_t;
 
-typedef struct sensor_data{
-  struct bme280_data  bme280_data;
-  UV_converted_values uv_data;
-  uint16_t            soil_wetness;
-} sensor_data_struct;
+// typedef struct sensor_data{
+//   struct bme280_data  bme280_data;
+//   UV_converted_values uv_data;
+//   uint16_t            soil_wetness;
+// } sensor_data_struct;
 
-typedef struct status_data {
-  status_state_t fan_state;
-  status_state_t lights_state;
-  status_state_t pdlc_state; 
-} status_data_struct;
+// typedef struct status_data {
+//   status_state_t fan_state;
+//   status_state_t lights_state;
+//   status_state_t pdlc_state; 
+// } status_data_struct;
 
 typedef struct Firebase_data {
   sensor_data_struct sensor_data;

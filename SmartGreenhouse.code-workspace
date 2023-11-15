@@ -12,7 +12,8 @@
 			"freertos.h": "c",
 			"esp_system.h": "c",
 			"sdkconfig.h": "c",
-			"typeinfo": "c"
+			"typeinfo": "c",
+			"queue.h": "c"
 		},
 		"idf.openOcdConfigs": [
 			"board/esp32s3-builtin.cfg"
