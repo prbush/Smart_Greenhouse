@@ -72,11 +72,5 @@ static void _pdlc_off(void)
 
 static pdlc_state_t _pdlc_get_state(void)
 {
-  pdlc_state_t read_state = gpio_get_level(self->gpio_pin_num);
-
-  if (read_state != self->current_state) {
-    ESP_LOGE(PDLC_TAG, "Mismatch between GPIO read state and stored state.");
-  }
-
-  return read_state;
+  return self->current_state;
 }

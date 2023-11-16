@@ -13,7 +13,12 @@
 			"esp_system.h": "c",
 			"sdkconfig.h": "c",
 			"typeinfo": "c",
-			"queue.h": "c"
+			"queue.h": "c",
+			"*.inc": "c",
+			"memory": "c",
+			"future": "c",
+			"istream": "c",
+			"functional": "c"
 		},
 		"idf.openOcdConfigs": [
 			"board/esp32s3-builtin.cfg"

@@ -72,11 +72,5 @@ static void _fan_off(void)
 
 static fan_state_t _fan_get_state(void)
 {
-  fan_state_t read_state = gpio_get_level(self->gpio_pin_num);
-
-  if (read_state != self->current_state) {
-    ESP_LOGE(FAN_TAG, "Mismatch between GPIO read state and stored state.");
-  }
-
-  return read_state;
+  return self->current_state;
 }

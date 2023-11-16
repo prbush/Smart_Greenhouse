@@ -104,6 +104,8 @@ Sample JSON
       "Lights": true,
       "PDLC": true
    }
+
+   "timestamp": 1234567,
 }
 */
 
@@ -122,7 +124,6 @@ static char* assemble_json_string(firebase_data_struct *data)
 
   // Name field
   cJSON_AddStringToObject(json, "name", "Smart Greenhouse");
-
 
   // Make the sensors array
   sensors = cJSON_AddArrayToObject(json, "Sensors");
@@ -169,6 +170,9 @@ static char* assemble_json_string(firebase_data_struct *data)
   status = cJSON_CreateObject();
   cJSON_AddBoolToObject(status, "PDLC", data->status_data.pdlc_state);
   cJSON_AddItemToArray(statuses, status);
+
+  // And finally, the timestamp
+  cJSON_AddNumberToObject(json, "timestamp", data->sensor_data.timestamp);
 
   string = cJSON_Print(json);
 

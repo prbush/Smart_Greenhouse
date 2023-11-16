@@ -53,10 +53,10 @@
 // Defines
 
 // /* GPIO pin assignments */
-#define ONBOARD_RGB_LED   CONFIG_BLINK_GPIO
-#define FAN_GPIO          CONFIG_FAN_GPIO
-#define LIGHTS_GPIO       CONFIG_LIGHTS_GPIO
-#define PDLC_GPIO         CONFIG_PDLC_GPIO
+// #define ONBOARD_RGB_LED   CONFIG_BLINK_GPIO
+// #define FAN_GPIO          CONFIG_FAN_GPIO
+// #define LIGHTS_GPIO       CONFIG_LIGHTS_GPIO
+// #define PDLC_GPIO         CONFIG_PDLC_GPIO
 
 /* WiFi settings */
 // TODO: remove unnecessary definitions and preprocessor commands
@@ -108,21 +108,6 @@
 
 // Firebase Realtime Database URL
 #define FIREBASE_URL "https://daily-trader-default-rtdb.firebaseio.com/apps.json"
-
-// SNTP defines
-// #ifndef INET6_ADDRSTRLEN
-// #define INET6_ADDRSTRLEN 48
-// #endif
-
-
-// I2C defines
-#define I2C_MASTER_SCL_IO           1       /*!< GPIO number used for I2C master clock */
-#define I2C_MASTER_SDA_IO           2       /*!< GPIO number used for I2C master data  */
-#define I2C_MASTER_NUM              0       /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
-#define I2C_MASTER_FREQ_HZ          400000  /*!< I2C master clock frequency */
-#define I2C_MASTER_TX_BUF_DISABLE   0       /*!< I2C master doesn't need buffer */
-#define I2C_MASTER_RX_BUF_DISABLE   0       /*!< I2C master doesn't need buffer */
-#define I2C_MASTER_TIMEOUT_MS       2500
 
 
 
@@ -184,6 +169,7 @@ Soil_sensor soil;
 Fan fan;
 Lights lights;
 PDLC pdlc;
+Environmental_control env_ctrl;
 /*
 
 App entry point
@@ -276,7 +262,7 @@ void firebase_task(void *arg)
     // ...
 
     // Send the data to firebase
-    // fb.send_data(&firebase_data);
+    fb.send_data(&firebase_data);
   }
 }
 
@@ -294,7 +280,7 @@ void sensors_task(void* arg)
   vTaskDelay(10);
 
   // Initialize the UV sensor
-  return_code = uv_sensor_init(&uv, I2C_NUM_0, GAIN_256x, MS_64);
+  return_code = uv_sensor_init(&uv, CONFIG_I2C_MASTER_NUM, GAIN_256x, MS_64);
   if (return_code != ESP_OK) {
     vTaskDelay(2000);
     esp_restart();
@@ -311,7 +297,7 @@ void sensors_task(void* arg)
 
   // Initialize the soil sensor
   // TODO: identify the soil dry/wet vals and put them here
-  return_code = soil_sensor_init(&soil, ADC_UNIT_1, ADC_CHANNEL_7, ADC_ATTEN_DB_11);
+  return_code = soil_sensor_init(&soil, CONFIG_SOIL_SENSOR_ADC_UNIT, CONFIG_SOIL_SENSOR_ADC_CHANNEL, ADC_ATTEN_DB_11);
   if (return_code != ESP_OK) {
     vTaskDelay(2000);
     esp_restart();
@@ -343,6 +329,9 @@ void sensors_task(void* arg)
     sensor_data.soil_wetness = soil.get_reading();
     ESP_LOGI(SENSOR_TAG, "Soil sensor reading: %u", sensor_data.soil_wetness);
 
+    // Throw in the timestamp
+    time(&now);
+    sensor_data.timestamp = now;
 
     // Send the sensor data to the environmental_control_task
     xQueueGenericSend(sensor_queue, &sensor_data, 1, queueSEND_TO_BACK);
@@ -353,21 +342,12 @@ void sensors_task(void* arg)
 
 void environmental_control_task(void *arg)
 {
-  // Testing counter
-  uint32_t toggle = 0;
-  bool lights_on = false;
-  bool fan_on = false;
-  bool pdlc_on = false;
-
-
   esp_err_t return_code = ESP_FAIL;
   sensor_data_struct sensor_data = {0};
   status_data_struct status_data = {0};
   firebase_data_struct firebase_data = {0};
 
-  return_code = fan_init(&fan, FAN_GPIO);
-  return_code = lights_init(&lights, LIGHTS_GPIO);
-  return_code = pdlc_init(&pdlc, PDLC_GPIO);
+  return_code = environmental_control_init(&env_ctrl, &fan, &lights, &pdlc);
 
   while(1) {
 
@@ -377,35 +357,9 @@ void environmental_control_task(void *arg)
 
     // Make enviromental changes (fan, pdlc, lights) as needed based on sensor data and set thresholds
     // ...
+    env_ctrl.process_env_data(sensor_data);
 
-    if (toggle % 5 == 0) {
-      fan_on = !fan_on;
-      if (!fan_on) {
-        fan.off();
-      } else {
-        fan.on();
-      }
-    }
-
-    if (toggle % 7 == 0) {
-      lights_on = !lights_on;
-      if (!lights_on) {
-        lights.off();
-      } else {
-        lights.on();
-      }
-    }
-
-    if (toggle % 9 == 0) {
-      pdlc_on = !pdlc_on;
-      if (!pdlc_on) {
-        pdlc.off();
-      } else {
-        pdlc.on();
-      }
-    }
-
-    toggle ++;
+    status_data = env_ctrl.get_statuses();
     
     // Gather statuses of the fan, pdlc, lights
     // ...
@@ -462,7 +416,7 @@ static void configure_led(void)
   ESP_LOGI(LED_TAG, "Application configured to blink addressable LED!");
   /* LED strip initialization with the GPIO and pixels number*/
   led_strip_config_t strip_config = {
-      .strip_gpio_num = ONBOARD_RGB_LED,
+      .strip_gpio_num = CONFIG_BLINK_GPIO,
       .max_leds = 1, // at least one LED on board
   };
   led_strip_rmt_config_t rmt_config = {
@@ -540,16 +494,16 @@ static esp_err_t i2c_master_init(void)
 {
     i2c_config_t conf = {
         .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_MASTER_SDA_IO,
-        .scl_io_num = I2C_MASTER_SCL_IO,
+        .sda_io_num = CONFIG_I2C_MASTER_SDA,
+        .scl_io_num = CONFIG_I2C_MASTER_SCL,
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+        .master.clk_speed = CONFIG_I2C_FAST_MODE
     };
 
     i2c_param_config(I2C_NUM_0, &conf);
 
-    return i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
+    return i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, CONFIG_I2C_MASTER_RX_BUF, CONFIG_I2C_MASTER_TX_BUF, 0);
 }
 
 //

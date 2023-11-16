@@ -72,11 +72,5 @@ static void _lights_off(void)
 
 static light_state_t _lights_get_state(void)
 {
-  light_state_t read_state = gpio_get_level(self->gpio_pin_num);
-
-  if (read_state != self->current_state) {
-    ESP_LOGE(LIGHT_TAG, "Mismatch between GPIO read state and stored state.");
-  }
-
-  return read_state;
+  return self->current_state;
 }

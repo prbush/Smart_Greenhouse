@@ -18,6 +18,9 @@
 #define UV_B_THRESHOLD        500 // uWatt / cm^2
 #define UV_C_THRESHOLD        500 // uWatt / cm^2
 
+#define ENV_TIMER_ID 1337
+#define SAMPLES_PER_MINUTE 60
+
 typedef enum status_state {
   OFF = 0,
   ON = 1
@@ -27,6 +30,7 @@ typedef struct sensor_data{
   struct bme280_data  bme280_data;
   UV_converted_values uv_data;
   uint16_t            soil_wetness;
+  time_t              timestamp;
 } sensor_data_struct;
 
 typedef struct status_data {
@@ -41,11 +45,18 @@ typedef struct Environmental_control {
   PDLC                *pdlc;
 
   TimerHandle_t       timer_handle;
+  uint32_t            timer_id;
 
   time_t              time_now;
   struct tm           time_info;
 
   sensor_data_struct  sensor_data;
+
+  uint64_t            uv_a_integral;
+
+  status_data_struct  (*get_statuses)(void);
+  void                (*process_env_data)(sensor_data_struct sensor_readings);
+
 
 } Environmental_control;
 
