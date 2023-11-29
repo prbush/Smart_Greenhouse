@@ -10,7 +10,8 @@ typedef enum fan_state {
 } fan_state_t;
 
 typedef struct Fan {
-  gpio_num_t    gpio_pin_num;
+  gpio_num_t    gpio_pin_num_fan_1;
+  gpio_num_t    gpio_pin_num_fan_2;
   gpio_config_t fet_gpio_config;
 
   fan_state_t   current_state;
@@ -20,6 +21,7 @@ typedef struct Fan {
   fan_state_t   (*get_state)(void);
 } Fan;
 
-esp_err_t fan_init(Fan* struct_ptr, gpio_num_t gpio_pin);
+esp_err_t fan_init(Fan* struct_ptr, gpio_num_t gpio_pin_fan_1,
+                   gpio_num_t gpio_pin_fan_2);
 
 #endif /* FAN_H */

@@ -60,15 +60,11 @@
 
 /* WiFi settings */
 // TODO: remove unnecessary definitions and preprocessor commands
-#ifdef USE_HOTSPOT
-#define EXAMPLE_ESP_WIFI_SSID      "Phil_iPhone"
-#define EXAMPLE_ESP_WIFI_PASS      "esp32wificonnection"
-#define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
-#else
+#define USE_HOTSPOT
+
 #define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
 #define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
 #define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
-#endif
 #define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
 #define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
 #define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
@@ -451,8 +447,13 @@ static void wifi_init_sta(void)
 
   wifi_config_t wifi_config = {
       .sta = {
+         #ifdef USE_HOTSPOT
+          .ssid = "Phil_iPhone",
+          .password = "esp32wificonnection",
+          #else
           .ssid = EXAMPLE_ESP_WIFI_SSID,
           .password = EXAMPLE_ESP_WIFI_PASS,
+          #endif
           /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
             * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
             * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
@@ -480,11 +481,22 @@ static void wifi_init_sta(void)
   /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
     * happened. */
   if (bits & WIFI_CONNECTED_BIT) {
+    #ifdef USE_HOTSPOT
+      ESP_LOGI(WIFI_TAG, "connected to ap SSID:%s password:%s",
+                "Phil_iPhone", "esp32wificonnection");
+    #else
       ESP_LOGI(WIFI_TAG, "connected to ap SSID:%s password:%s",
                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+
+    #endif
   } else if (bits & WIFI_FAIL_BIT) {
+    #ifdef USE_HOTSPOT
+      ESP_LOGI(WIFI_TAG, "Failed to connect to SSID:%s, password:%s",
+                "Phil_iPhone", "esp32wificonnection");
+    #else
       ESP_LOGI(WIFI_TAG, "Failed to connect to SSID:%s, password:%s",
                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+    #endif
   } else {
       ESP_LOGE(WIFI_TAG, "UNEXPECTED EVENT");
   }

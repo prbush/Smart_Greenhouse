@@ -4,6 +4,8 @@
 #include "esp_err.h"
 #include "driver/gpio.h"
 
+#define TOGGLE_DELAY 500
+
 typedef enum pdlc_state {
   PDLC_OFF = 0,
   PDLC_ON = 1

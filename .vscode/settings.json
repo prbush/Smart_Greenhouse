@@ -11,7 +11,7 @@
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
-  "idf.portWin": "COM6",
+  "idf.portWin": "COM3",
   "idf.pythonBinPathWin": "C:\\Users\\veteran\\.espressif\\python_env\\idf5.1_py3.11_env\\Scripts\\python.exe",
   "idf.toolsPathWin": "C:\\Users\\veteran\\.espressif",
   "files.associations": {

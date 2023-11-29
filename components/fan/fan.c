@@ -18,13 +18,15 @@ static void _fan_on(void);
 static void _fan_off(void);
 static fan_state_t _fan_get_state(void);
 
-esp_err_t fan_init(Fan* struct_ptr, gpio_num_t gpio_pin)
+esp_err_t fan_init(Fan* struct_ptr, gpio_num_t gpio_pin_fan_1,
+                   gpio_num_t gpio_pin_fan_2)
 {
   esp_err_t return_code = ESP_OK;
 
   // Assign struct fields
   self = struct_ptr;
-  self->gpio_pin_num = gpio_pin;
+  self->gpio_pin_fan_1 = gpio_pin_fan_1;
+  self->gpio_pin_fan_2 = gpio_pin_fan_2;
   self->on = _fan_on;
   self->off = _fan_off;
   self->get_state = _fan_get_state;
@@ -54,7 +56,8 @@ esp_err_t fan_init(Fan* struct_ptr, gpio_num_t gpio_pin)
 
 static void _fan_on(void)
 {
-  gpio_set_level(self->gpio_pin_num, (uint32_t)FAN_ON);
+  gpio_set_level(self->gpio_pin_fan_1, (uint32_t)FAN_ON);
+  gpio_set_level(self->gpio_pin_fan_2, (uint32_t)FAN_ON);
 
   ESP_LOGI(FAN_TAG, "Fan on.");
 
@@ -63,7 +66,8 @@ static void _fan_on(void)
 
 static void _fan_off(void)
 {
-  gpio_set_level(self->gpio_pin_num, (uint32_t)FAN_OFF);
+  gpio_set_level(self->gpio_pin_fan_1, (uint32_t)FAN_OFF);
+  gpio_set_level(self->gpio_pin_fan_2, (uint32_t)FAN_OFF);
 
   ESP_LOGI(FAN_TAG, "Fan off.");
 

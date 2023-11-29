@@ -48,7 +48,7 @@ esp_err_t environmental_control_init(Environmental_control *struct_ptr, Fan *fan
   self->process_env_data = _environmental_control_process_env_data;
 
   // Initialize the fan, lights, pdlc
-  return_code = fan_init(self->fan, CONFIG_FAN_GPIO);
+  return_code = fan_init(self->fan, CONFIG_FAN_1_GPIO, CONFIG_FAN_2_GPIO);
   if (return_code != ESP_OK) {
     return return_code;
   }
@@ -135,7 +135,7 @@ static void _environmental_control_process_env_data(sensor_data_struct sensor_re
     }
   }
 
-  if (toggle % 9 == 0) {
+  if (toggle % 3 == 0) {
     pdlc_on = !pdlc_on;
     if (!pdlc_on) {
       self->pdlc->off();

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <unistd.h>
 #include "esp_err.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
@@ -54,6 +55,7 @@ esp_err_t pdlc_init(PDLC* struct_ptr, gpio_num_t gpio_pin)
 
 static void _pdlc_on(void)
 {
+  // Have to cycle through the modes
   gpio_set_level(self->gpio_pin_num, (uint32_t)PDLC_ON);
 
   ESP_LOGI(PDLC_TAG, "PDLC on.");
@@ -63,6 +65,7 @@ static void _pdlc_on(void)
 
 static void _pdlc_off(void)
 {
+  // Have to cycle through the modes
   gpio_set_level(self->gpio_pin_num, (uint32_t)PDLC_OFF);
 
   ESP_LOGI(PDLC_TAG, "PDLC off.");
