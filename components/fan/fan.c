@@ -25,8 +25,8 @@ esp_err_t fan_init(Fan* struct_ptr, gpio_num_t gpio_pin_fan_1,
 
   // Assign struct fields
   self = struct_ptr;
-  self->gpio_pin_fan_1 = gpio_pin_fan_1;
-  self->gpio_pin_fan_2 = gpio_pin_fan_2;
+  self->gpio_pin_num_fan_1 = gpio_pin_fan_1;
+  self->gpio_pin_num_fan_2 = gpio_pin_fan_2;
   self->on = _fan_on;
   self->off = _fan_off;
   self->get_state = _fan_get_state;
@@ -36,7 +36,8 @@ esp_err_t fan_init(Fan* struct_ptr, gpio_num_t gpio_pin_fan_1,
   // Set as output mode
   self->fet_gpio_config.mode = GPIO_MODE_OUTPUT;
   // Bit mask of the pin to be set
-  self->fet_gpio_config.pin_bit_mask = (((uint64_t)1) << ((uint64_t)gpio_pin));
+  self->fet_gpio_config.pin_bit_mask = (((uint64_t)1) << ((uint64_t)gpio_pin_fan_1)) 
+                                     | (((uint64_t)1) << ((uint64_t)gpio_pin_fan_2));
   // Disable pull-down mode
   self->fet_gpio_config.pull_down_en = 0;
   // Disable pull-up mode
@@ -56,8 +57,8 @@ esp_err_t fan_init(Fan* struct_ptr, gpio_num_t gpio_pin_fan_1,
 
 static void _fan_on(void)
 {
-  gpio_set_level(self->gpio_pin_fan_1, (uint32_t)FAN_ON);
-  gpio_set_level(self->gpio_pin_fan_2, (uint32_t)FAN_ON);
+  gpio_set_level(self->gpio_pin_num_fan_1, (uint32_t)FAN_ON);
+  gpio_set_level(self->gpio_pin_num_fan_2, (uint32_t)FAN_ON);
 
   ESP_LOGI(FAN_TAG, "Fan on.");
 
@@ -66,8 +67,8 @@ static void _fan_on(void)
 
 static void _fan_off(void)
 {
-  gpio_set_level(self->gpio_pin_fan_1, (uint32_t)FAN_OFF);
-  gpio_set_level(self->gpio_pin_fan_2, (uint32_t)FAN_OFF);
+  gpio_set_level(self->gpio_pin_num_fan_1, (uint32_t)FAN_OFF);
+  gpio_set_level(self->gpio_pin_num_fan_2, (uint32_t)FAN_OFF);
 
   ESP_LOGI(FAN_TAG, "Fan off.");
 
