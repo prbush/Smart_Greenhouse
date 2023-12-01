@@ -10,8 +10,8 @@
  * which will be higher in dry soil vs wet. */ 
 #define OPEN_AIR_COUNTS       2725
 #define IN_WATER_COUNTS       100
-#define SOIL_DRY_COUNTS       400
-#define SOIL_SATURATED_COUNTS 250
+#define SOIL_DRY_COUNTS       2715
+#define SOIL_SATURATED_COUNTS 1300
 
 typedef struct Soil_sensor {
   adc_oneshot_unit_handle_t   adc_handle;
@@ -20,12 +20,12 @@ typedef struct Soil_sensor {
   adc_cali_handle_t           calibration_handle;
   adc_channel_t               adc_channel;  // ADC_CHANNEL_7
 
-  uint32_t              soil_min_val;
-  uint32_t              soil_max_val;
+  uint32_t                    soil_min_val;
+  uint32_t                    soil_max_val;
 
-  bool                  is_calibrated;
+  bool                        is_calibrated;
   
-  uint16_t              (*get_reading)(void);
+  int                         (*get_reading)(void);
 } Soil_sensor;
 
 esp_err_t soil_sensor_init(Soil_sensor *struct_ptr, adc_unit_t adc_unit, adc_channel_t adc_channel, 

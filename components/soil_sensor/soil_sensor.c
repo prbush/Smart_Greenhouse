@@ -17,7 +17,7 @@ const char *SOIL_TAG = "Soil Sensor";
 static esp_err_t adc_calibration_init(void);
 
 // Public functions privided via struct fn pointers
-static uint16_t _soil_sensor_get_readings(void);
+static int _soil_sensor_get_readings(void);
 
 /*!
  * Public init function
@@ -77,16 +77,24 @@ esp_err_t soil_sensor_init(Soil_sensor *struct_ptr, adc_unit_t adc_unit, adc_cha
 /*!
  * Read the ADC as one-shot
  */
-static uint16_t _soil_sensor_get_readings(void)
+static int _soil_sensor_get_readings(void)
 {
-  int adc_raw_count = 0;
+  int adc_raw_counts = 0;
+  int mapped_percentage = 0;
+  int counts_per_percent = abs(SOIL_SATURATED_COUNTS - SOIL_DRY_COUNTS) / 100;
 
   adc_oneshot_get_calibrated_result(self->adc_handle, self->calibration_handle, self->adc_channel,
-    &adc_raw_count);
+    &adc_raw_counts);
 
-  // TODO: map the raw counts to 0-100%
+  // Map the ADC raw counts to a range of 0-100% based on the calibrated values of dry and saturated
+  mapped_percentage = adc_raw_counts / counts_per_percent;
 
-  return (uint16_t) adc_raw_count;
+  // constrain to 0-100 if out of bounds (to account for innacuracies)
+  mapped_percentage = (mapped_percentage  > 100) ? 100 :
+                      (mapped_percentage  < 0)   ? 0   :
+                       mapped_percentage;
+
+  return mapped_percentage;
 }
 
 
