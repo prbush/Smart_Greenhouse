@@ -7,6 +7,7 @@
 #include "sdkconfig.h"
 #include "environmental_control.h"
 
+extern struct tm global_start_time;
 
 
 
@@ -31,6 +32,7 @@ const char* ENVIRONMENTAL_TAG = "Environmental control";
 
 // Private functions
 void check_for_env_changes_callback(TimerHandle_t xTimer);
+static void manage_lights(void);
 // Public functions privided via struct fn pointers
 static status_data_struct _environmental_control_get_statuses(void);
 static void _environmental_control_process_env_data(sensor_data_struct sensor_readings);
@@ -117,6 +119,9 @@ static void _environmental_control_process_env_data(sensor_data_struct sensor_re
           !! Can we check for sunset times? If so, turn off at sunset
   */
 
+  time(&self->time_now);
+  localtime_r(&self->time_now, &self->time_info);
+
   if (toggle % 5 == 0) {
     fan_on = !fan_on;
     if (!fan_on) {
@@ -156,4 +161,23 @@ void check_for_env_changes_callback(TimerHandle_t xTimer)
 
 
   return;
+}
+
+static void manage_lights(void) 
+{
+  if (CLASS_DEMO) {
+    // The lights will be on for 5 mins
+    if ((self->time_info.tm_min >= global_start_time.tm_min) && (self->lights->get_state() != LIGHT_ON)) {
+      self->lights->on();
+    } else if ((self->time_info.tm_hour >= (global_start_time.tm_min + 5)) && (self->lights->get_state() != LIGHT_OFF)) {
+      self->lights->off();
+    }
+  } else {
+    // The lights will be on during the daylight hours
+    if ((self->time_info.tm_hour >= DAYLIGHT_START) && (self->lights->get_state() != LIGHT_ON)) {
+      self->lights->on();
+    } else if ((self->time_info.tm_hour >= DAYLIGHT_END) && (self->lights->get_state() != LIGHT_OFF)) {
+      self->lights->off();
+    }
+  }
 }

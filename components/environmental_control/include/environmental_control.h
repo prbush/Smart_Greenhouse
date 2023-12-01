@@ -12,6 +12,9 @@
 #include "environmental_sensor.h"
 #include "uv_sensor.h"
 
+// For the class demo, we define much shorter timescales for environmental control
+#define CLASS_DEMO true
+
 #define HUMIDITY_THRESHOLD    80  // degC
 #define TEMPERATURE_THRESHOLD 90  // Rh
 #define UV_A_THRESHOLD       1000 // uWatt / cm^2
@@ -20,6 +23,8 @@
 
 #define ENV_TIMER_ID 1337
 #define SAMPLES_PER_MINUTE 60
+#define DAYLIGHT_START 6 // 06:00am
+#define DAYLIGHT_END 18  // 06:00pm (18:00)
 
 typedef enum status_state {
   OFF = 0,
@@ -53,6 +58,8 @@ typedef struct Environmental_control {
   sensor_data_struct  sensor_data;
 
   uint64_t            uv_a_integral;
+  uint64_t            uv_b_integral;
+  uint64_t            uv_c_integral;
 
   status_data_struct  (*get_statuses)(void);
   void                (*process_env_data)(sensor_data_struct sensor_readings);

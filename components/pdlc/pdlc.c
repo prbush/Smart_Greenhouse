@@ -37,9 +37,9 @@ esp_err_t pdlc_init(PDLC* struct_ptr, gpio_num_t gpio_pin)
   // Bit mask of the pin to be set
   self->fet_gpio_config.pin_bit_mask = (((uint64_t)1) << ((uint64_t)gpio_pin));
   // Disable pull-down mode
-  self->fet_gpio_config.pull_down_en = 0;
+  self->fet_gpio_config.pull_down_en = 1;
   // Disable pull-up mode
-  self->fet_gpio_config.pull_up_en = 0;
+  self->fet_gpio_config.pull_up_en = 1;
   // Configure GPIO with the given settings
   return_code = gpio_config(&(self->fet_gpio_config));
 

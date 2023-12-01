@@ -52,12 +52,6 @@
 //
 // Defines
 
-// /* GPIO pin assignments */
-// #define ONBOARD_RGB_LED   CONFIG_BLINK_GPIO
-// #define FAN_GPIO          CONFIG_FAN_GPIO
-// #define LIGHTS_GPIO       CONFIG_LIGHTS_GPIO
-// #define PDLC_GPIO         CONFIG_PDLC_GPIO
-
 /* WiFi settings */
 // TODO: remove unnecessary definitions and preprocessor commands
 #define USE_HOTSPOT
@@ -156,6 +150,7 @@ static uint8_t red, green, blue;
 static int s_retry_num = 0;
 time_t now;
 struct tm timeinfo;
+struct tm global_start_time;
 
 /* Passable Objects */
 Firebase fb;
@@ -199,6 +194,8 @@ void app_main(void)
   // Connect to WiFi
   wifi_init_sta();
 
+  obtain_time();
+
   // Check the time and set via NTP if needed
   // Get current time and local time
   time(&now);
@@ -212,6 +209,9 @@ void app_main(void)
     time(&now);
     localtime_r(&now, &timeinfo);
   }
+
+  // Get the start time
+  localtime_r(&now, &global_start_time);
 
   // Create RTOS threads
   xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
