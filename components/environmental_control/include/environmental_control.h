@@ -61,6 +61,8 @@ typedef struct Environmental_control {
   uint64_t            uv_b_integral;
   uint64_t            uv_c_integral;
 
+  bool                is_daylight;
+
   status_data_struct  (*get_statuses)(void);
   void                (*process_env_data)(sensor_data_struct sensor_readings);
 

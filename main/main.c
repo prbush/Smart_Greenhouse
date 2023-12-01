@@ -96,6 +96,9 @@
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
+// The sensor timer go bit
+#define SENSOR_CYCLE_START_BIT BIT0
+
 // Firebase Realtime Database URL
 #define FIREBASE_URL "https://daily-trader-default-rtdb.firebaseio.com/apps.json"
 
@@ -119,6 +122,7 @@ static void wifi_init_sta(void);
 static esp_err_t i2c_master_init(void);
 static void obtain_time(void);
 static void time_sync_notification_cb(struct timeval *tv);
+static void sensor_timer_callback(TimerHandle_t xTimer);
 
 
 //
@@ -134,6 +138,8 @@ static EventGroupHandle_t task_control_events;
 static QueueHandle_t firebase_queue;
 static QueueHandle_t sensor_queue;
 static QueueHandle_t env_ctrl_queue;
+static TimerHandle_t sensor_timer_handle;
+static uint32_t      sensor_timer_id = 475;
 
 /* Const strings */
 static const char *WIFI_TAG = "WIFI";
@@ -174,6 +180,8 @@ void app_main(void)
   firebase_queue = xQueueCreate(10, sizeof(firebase_data_struct));
   sensor_queue = xQueueCreate(10, sizeof(sensor_data_struct));
   env_ctrl_queue = xQueueCreate(10, sizeof(status_data_struct));
+  sensor_timer_handle = xTimerCreate("Sensor timer", 10 * CONFIG_FREERTOS_HZ, pdTRUE, 
+                                    &sensor_timer_id, sensor_timer_callback);
 
   //Initialize NVS, needed for WiFi
   esp_err_t ret = nvs_flash_init();
@@ -268,6 +276,7 @@ void sensors_task(void* arg)
   struct bme280_data  env_sensor_readings = {0};
   UV_converted_values uv_readings = {0};
   esp_err_t           return_code;
+  EventBits_t         status_bit = 0;
 
   // Initialize I2C as master
   ESP_ERROR_CHECK(i2c_master_init());
@@ -304,6 +313,14 @@ void sensors_task(void* arg)
     memset(&sensor_data, 0, sizeof(sensor_data_struct));
     memset(&env_sensor_readings, 0, sizeof(struct bme280_data));
     memset(&uv_readings, 0, sizeof(UV_converted_values));
+
+    // Wait until we get the event flag set by the timer before running
+    status_bit = xEventGroupWaitBits(task_control_events, SENSOR_CYCLE_START_BIT, pdTRUE,
+                       pdTRUE, 1000);
+                      
+    if (!(status_bit & SENSOR_CYCLE_START_BIT)) {
+      continue;
+    }
 
     // Get BME280 readings
     return_code = env.get_readings(&env_sensor_readings);
@@ -575,4 +592,18 @@ static void obtain_time(void)
   localtime_r(&now, &timeinfo);
   strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
   ESP_LOGI(SNTP_TAG, "The current date/time is: %s", strftime_buf);
+}
+
+static void sensorTimerCallback(TimerHandle_t xTimer)
+{
+  EventBits_t wifi_status = xEventGroupGetBits(s_wifi_event_group);
+  // Sanity check that another timer didn't magically fire this callback
+  if ((uint32_t)pvTimerGetTimerID(xTimer) != sensor_timer_id) {
+    return;
+  }
+
+  // Check that we are connected to WiFi
+  if (wifi_status & WIFI_CONNECTED_BIT) {
+    xEventGroupSetBits(task_control_events, SENSOR_CYCLE_START_BIT);
+  }
 }
