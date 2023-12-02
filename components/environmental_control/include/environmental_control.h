@@ -25,6 +25,7 @@
 #define SAMPLES_PER_MINUTE 60
 #define DAYLIGHT_START 6 // 06:00am
 #define DAYLIGHT_END 18  // 06:00pm (18:00)
+#define ONE_MINUTE 60
 
 typedef enum status_state {
   OFF = 0,
@@ -49,19 +50,24 @@ typedef struct Environmental_control {
   Lights              *lights;
   PDLC                *pdlc;
 
+  sensor_data_struct  current_sensor_data;
+
   TimerHandle_t       timer_handle;
   uint32_t            timer_id;
 
   time_t              time_now;
   struct tm           time_info;
+  struct bme280_data  *time_series_ptr;
 
-  sensor_data_struct  sensor_data;
+  float               uv_a_integral;
+  float               uv_b_integral;
+  float               uv_c_integral;
 
-  uint64_t            uv_a_integral;
-  uint64_t            uv_b_integral;
-  uint64_t            uv_c_integral;
+  uint32_t            timer_period;
+  uint32_t            timer_fires_counter;
 
   bool                is_daylight;
+  bool                timer_running;
 
   status_data_struct  (*get_statuses)(void);
   void                (*process_env_data)(sensor_data_struct sensor_readings);

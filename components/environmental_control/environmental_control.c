@@ -33,6 +33,8 @@ const char* ENVIRONMENTAL_TAG = "Environmental control";
 // Private functions
 void check_for_env_changes_callback(TimerHandle_t xTimer);
 static void manage_lights(void);
+static void manage_fans(void);
+static void manage_pdlc(void);
 // Public functions privided via struct fn pointers
 static status_data_struct _environmental_control_get_statuses(void);
 static void _environmental_control_process_env_data(sensor_data_struct sensor_readings);
@@ -45,7 +47,12 @@ esp_err_t environmental_control_init(Environmental_control *struct_ptr, Fan *fan
   self->fan = fan;
   self->lights = lights;
   self->pdlc = pdlc;
+  self->time_series_ptr = NULL;
   self->timer_id = ENV_TIMER_ID;
+  self->timer_period = ONE_MINUTE;
+  self->timer_fires_counter = 0;
+  self->is_daylight = false;
+  self->timer_running = false;
   self->get_statuses = _environmental_control_get_statuses;
   self->process_env_data = _environmental_control_process_env_data;
 
@@ -66,7 +73,7 @@ esp_err_t environmental_control_init(Environmental_control *struct_ptr, Fan *fan
   }
 
   // Initialize our timer. Note this won't start until we tell it to
-  self->timer_handle = xTimerCreate("ENV timer", 60 * CONFIG_FREERTOS_HZ, pdFALSE, 
+  self->timer_handle = xTimerCreate("ENV timer", self->timer_period * CONFIG_FREERTOS_HZ, pdFALSE, 
                                       &(self->timer_id), check_for_env_changes_callback);
 
   return return_code;
@@ -85,39 +92,8 @@ static status_data_struct _environmental_control_get_statuses(void)
 
 static void _environmental_control_process_env_data(sensor_data_struct sensor_readings)
 {
-  /*
-  Make this a coroutine. Have early exit if values are below threashold. Make sure
-  to add to the accumuators for UV a,b,c. Need to do conversion:
-
-   uW/cm^2
-  --------- * Time = j/cm^2 -- > time will be time between measurements (1 sec)
-    1,000
-
-  If values are above the threshold:
-    1) start the timer
-    2) create an array for storing requisite data for a time series
-    3) set some status flag that the time series has been created
-    4) In subsequent calls, save the sensor data to the time series
-      - Need to check indicied to prevent overflow
-    5) When the timer has fired, set some status bit to indicate that the time
-       series is now expired and should be deleted. 
-
-    Each "thing" will require different logic...
-    Fan:
-      If temp or humidity is above threshold, turn on
-      If the timer fires and the values are below threshold, turn off
-      If timer fires and values are above threshold but slope is negative,
-        restart the timer and keep going
-          -- There needs to be some reasonable cutoff -- some max number of times
-             the timer can be set
-    
-    Lights:
-      Lights should simply be on from 6AM local to 6PM local -- check the time
-
-    PDLC: Turn on if UV B or C accumulated vales are above threshold.
-          Turn off after the lights have been turned off
-          !! Can we check for sunset times? If so, turn off at sunset
-  */
+  // Grab the readings and the current time
+  self->current_sensor_data = sensor_readings;
 
   time(&self->time_now);
   localtime_r(&self->time_now, &self->time_info);
@@ -138,7 +114,32 @@ static void _environmental_control_process_env_data(sensor_data_struct sensor_re
     }
   }
 
+/* if needed:
+
+   uW/cm^2
+  --------- * Time = j/cm^2 -- > time will be time between measurements (1 sec)
+    1,000
+
+*/
+
+  if (self->is_daylight) {
+    // Since we are running the sensors at 1Hz, we can just add the current
+    // UV sensor readings to the integral
+    self->uv_a_integral += sensor_readings.uv_data.UV_A;
+    self->uv_b_integral += sensor_readings.uv_data.UV_B;
+    self->uv_c_integral += sensor_readings.uv_data.UV_C;
+  } else {
+    // Make sure we start fresh for the next daylight period
+    self->uv_a_integral = 0;
+    self->uv_b_integral = 0;
+    self->uv_c_integral = 0;
+  }
+
+  // Do the stuff
   manage_lights();
+  manage_fans();
+  manage_pdlc();
+
 
   if (toggle % 5 == 0) {
     fan_on = !fan_on;
@@ -172,6 +173,7 @@ static void _environmental_control_process_env_data(sensor_data_struct sensor_re
 
 void check_for_env_changes_callback(TimerHandle_t xTimer)
 {
+  self->timer_running = false;
   // Sanity check that another timer didn't magically fire this callback
   if ((uint32_t)pvTimerGetTimerID(xTimer) != self->timer_id) {
     return;
@@ -183,7 +185,7 @@ void check_for_env_changes_callback(TimerHandle_t xTimer)
 
 static void manage_lights(void) 
 {
-  // The lights will be on for 5 mins
+  // The lights will be on during daylight hours, off otherwise
   if (self->is_daylight && (self->lights->get_state() != LIGHT_ON)) {
     self->lights->on();
   } else if (!self->is_daylight && (self->lights->get_state() != LIGHT_OFF)) {
@@ -193,10 +195,45 @@ static void manage_lights(void)
 
 static void manage_pdlc(void)
 {
-  // The lights will be on for 5 mins
-  if (self->is_daylight && (self->lights->get_state() != LIGHT_ON)) {
-    self->lights->on();
-  } else if (!self->is_daylight && (self->lights->get_state() != LIGHT_OFF)) {
-    self->lights->off();
+  bool above_threshold = false;
+
+  if (self->is_daylight) {
+
+    above_threshold = (self->uv_a_integral > UV_A_THRESHOLD) ||
+                      (self->uv_b_integral > UV_B_THRESHOLD) ||
+                      (self->uv_c_integral > UV_C_THRESHOLD);
+    
+    if (above_threshold && (self->pdlc->get_state() != PDLC_ON)) {
+      self->pdlc->off();
+    }
+
+  } else if (self->pdlc->get_state() != PDLC_OFF) {
+    
+    self->pdlc->off();
+
   }
+}
+
+static void manage_fans(void)
+{
+  /*
+  If values are above the threshold:
+    1) start the timer
+    2) create an array for storing requisite data for a time series
+    3) set some status flag that the time series has been created
+    4) In subsequent calls, save the sensor data to the time series
+      - Need to check indicied to prevent overflow
+    5) When the timer has fired, set some status bit to indicate that the time
+       series is now expired and should be deleted. 
+
+    Each "thing" will require different logic...
+    Fan:
+      If temp or humidity is above threshold, turn on
+      If the timer fires and the values are below threshold, turn off
+      If timer fires and values are above threshold but slope is negative,
+        restart the timer and keep going
+          -- There needs to be some reasonable cutoff -- some max number of times
+             the timer can be set
+  */
+  
 }

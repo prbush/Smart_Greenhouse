@@ -147,8 +147,6 @@ static const char *LED_TAG = "LED";
 static const char *SENSOR_TAG = "Sensor task";
 static const char *ENV_CONTROL = "Environmental Control task";
 static const char *SNTP_TAG = "SNTP";
-// Testing JSON string
-char * sample_json_string = "{\"Temp\":\"50\",\"Pressure\":\"90\",\"Humidity\":\"55\",\"UV A\":\"300\",\"UV B\":\"250\",\"UV C\":\"125\",\"Soil sensor\":\"1300\"}";
 
 /* Static objects and reference data */
 static led_strip_handle_t led_strip;
@@ -180,7 +178,7 @@ void app_main(void)
   firebase_queue = xQueueCreate(10, sizeof(firebase_data_struct));
   sensor_queue = xQueueCreate(10, sizeof(sensor_data_struct));
   env_ctrl_queue = xQueueCreate(10, sizeof(status_data_struct));
-  sensor_timer_handle = xTimerCreate("Sensor timer", 10 * CONFIG_FREERTOS_HZ, pdTRUE, 
+  sensor_timer_handle = xTimerCreate("Sensor timer", CONFIG_FREERTOS_HZ, pdTRUE, 
                                     &sensor_timer_id, sensor_timer_callback);
 
   //Initialize NVS, needed for WiFi
@@ -261,9 +259,6 @@ void firebase_task(void *arg)
   while(1) {
     // Wait until we get a message from the enviromental control task
     xQueueReceive(firebase_queue, &firebase_data, portMAX_DELAY);
-
-    // Assemble a JSON string with the firebase data
-    // ...
 
     // Send the data to firebase
     fb.send_data(&firebase_data);
@@ -594,7 +589,7 @@ static void obtain_time(void)
   ESP_LOGI(SNTP_TAG, "The current date/time is: %s", strftime_buf);
 }
 
-static void sensorTimerCallback(TimerHandle_t xTimer)
+static void sensor_timer_callback(TimerHandle_t xTimer)
 {
   EventBits_t wifi_status = xEventGroupGetBits(s_wifi_event_group);
   // Sanity check that another timer didn't magically fire this callback
