@@ -35,6 +35,7 @@ void check_for_env_changes_callback(TimerHandle_t xTimer);
 static void manage_lights(void);
 static void manage_fans(void);
 static void manage_pdlc(void);
+bool check_slopes(void);
 // Public functions privided via struct fn pointers
 static status_data_struct _environmental_control_get_statuses(void);
 static void _environmental_control_process_env_data(sensor_data_struct sensor_readings);
@@ -48,11 +49,14 @@ esp_err_t environmental_control_init(Environmental_control *struct_ptr, Fan *fan
   self->lights = lights;
   self->pdlc = pdlc;
   self->time_series_ptr = NULL;
+  self->time_series_index = 0;
   self->timer_id = ENV_TIMER_ID;
   self->timer_period = ONE_MINUTE;
   self->timer_fires_counter = 0;
   self->is_daylight = false;
   self->timer_running = false;
+  self->over_temp = false;
+  self->over_humidity = false;
   self->get_statuses = _environmental_control_get_statuses;
   self->process_env_data = _environmental_control_process_env_data;
 
@@ -174,12 +178,45 @@ static void _environmental_control_process_env_data(sensor_data_struct sensor_re
 void check_for_env_changes_callback(TimerHandle_t xTimer)
 {
   self->timer_running = false;
+  self->time_series_index = 0;
   // Sanity check that another timer didn't magically fire this callback
   if ((uint32_t)pvTimerGetTimerID(xTimer) != self->timer_id) {
     return;
   }
 
+  /* Simple case first -- if the current temp and humidity are below
+   * threshold values, then we can turn the fan off and move on. 
+   */
+  if (!(self->over_temp || self->over_humidity)) {
+    // Reset the timer run counter
+    self->timer_fires_counter = 0;
+    // Turn off the fan
+    self->fan->off();
+  }
 
+  /* Now the more complex case -- we are still over temp/humidity.
+   * In this case, we need to see if the slopes are negative. 
+   *  -If they are, then we can keep running, up to MAX_TIMER_FIRES to try
+   *   to get below threshold values.
+   *  -If the slopes are positive, then we cannot correct by using the fan
+   *   and should stop trying. 
+   */
+  bool has_negative_slope = check_slopes();
+  if (!has_negative_slope) {
+    time(&(self->give_up_time));
+    self->timer_fires_counter = 0;
+  } else {
+    // We have a negative slope, need to see if we should keep trying
+    if (self->timer_fires_counter == MAX_TIMER_FIRES) {
+      time(&(self->give_up_time));
+      self->timer_fires_counter = 0;
+    } else {
+      self->timer_fires_counter++;
+    }
+  }
+  
+  // Free the time series array
+  free(self->time_series_ptr);
   return;
 }
 
@@ -235,5 +272,65 @@ static void manage_fans(void)
           -- There needs to be some reasonable cutoff -- some max number of times
              the timer can be set
   */
-  
+  if (!self->timer_running) {
+    // Check thresholds
+    self->over_temp = self->current_sensor_data.bme280_data.temperature > TEMPERATURE_THRESHOLD;
+    self->over_humidity = self->current_sensor_data.bme280_data.humidity > HUMIDITY_THRESHOLD;
+
+    if (self->over_temp || self->over_humidity) {
+      // See if we should try to correct
+
+      // Start the timer
+      xTimerStart(self->timer_handle, 1);
+      self->timer_running = true;
+
+      // Allocate our array
+      self->time_series_ptr = (struct bme280_data*) malloc(sizeof(struct bme280_data) * SAMPLES_PER_MINUTE);
+      self->time_series_index = 0;
+
+      // Store the current bme280 data for later comparison
+      self->time_series_ptr[self->time_series_index++] = self->current_sensor_data.bme280_data;
+    }
+
+  } else {
+    // Store the current sensor data
+    if (self->time_series_index > (SAMPLES_PER_MINUTE - 1)) {
+      self->time_series_ptr[self->time_series_index++] = self->current_sensor_data.bme280_data;
+    }
+    // Store the over temp/humidity flags
+    // Check thresholds
+    self->over_temp = self->current_sensor_data.bme280_data.temperature > TEMPERATURE_THRESHOLD;
+    self->over_humidity = self->current_sensor_data.bme280_data.humidity > HUMIDITY_THRESHOLD;
+  }
+}
+
+bool check_slopes(void)
+{
+  // We want to check that the slope over the entire timer period is negative
+  self->time_series_index--;
+  double start_humidity = self->time_series_ptr[0].humidity;
+  double end_humidity   = self->time_series_ptr[self->time_series_index].humidity;
+  double start_temp     = self->time_series_ptr[0].temperature;
+  double end_temp       = self->time_series_ptr[self->time_series_index].temperature;
+
+  bool negative_temp_slope = (end_temp < start_temp);
+  bool negative_humidity_slope = (end_humidity < start_humidity);
+  bool return_value = false;
+
+  // Only over humidity
+  if (self->over_humidity && !self->over_temp) {
+    return_value = negative_humidity_slope;
+  }
+
+  // Only over temp
+  if (self->over_temp && !self->over_humidity) {
+    return_value = negative_temp_slope;
+  }
+
+  // Both over temp and over humidity
+  if (self->over_humidity && self->over_temp) {
+    return_value = negative_humidity_slope && negative_temp_slope;
+  }
+
+  return return_value;
 }
