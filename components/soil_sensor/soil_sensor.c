@@ -81,18 +81,19 @@ static int _soil_sensor_get_readings(void)
 {
   int adc_raw_counts = 0;
   int mapped_percentage = 0;
-  int counts_per_percent = abs(SOIL_SATURATED_COUNTS - SOIL_DRY_COUNTS) / 100;
+  int percentage = 0;
+  int counts_per_percent = (SOIL_DRY_COUNTS - SOIL_SATURATED_COUNTS) / 100;
 
   adc_oneshot_get_calibrated_result(self->adc_handle, self->calibration_handle, self->adc_channel,
     &adc_raw_counts);
 
   // Map the ADC raw counts to a range of 0-100% based on the calibrated values of dry and saturated
-  mapped_percentage = adc_raw_counts / counts_per_percent;
+  percentage = (adc_raw_counts - SOIL_SATURATED_COUNTS) / counts_per_percent;
 
   // constrain to 0-100 if out of bounds (to account for innacuracies)
-  mapped_percentage = (mapped_percentage  > 100) ? 100 :
-                      (mapped_percentage  < 0)   ? 0   :
-                       mapped_percentage;
+  mapped_percentage = (percentage  > 100) ? 100 :
+                      (percentage  < 0)   ? 0   :
+                       percentage;
 
   return mapped_percentage;
 }

@@ -15,18 +15,18 @@
 // For the class demo, we define much shorter timescales for environmental control
 #define CLASS_DEMO true
 
-#define HUMIDITY_THRESHOLD    80  // Rh
-#define TEMPERATURE_THRESHOLD 90  // degC
-#define UV_A_THRESHOLD       1000 // uWatt / cm^2
-#define UV_B_THRESHOLD        500 // uWatt / cm^2
-#define UV_C_THRESHOLD        500 // uWatt / cm^2
+#define HUMIDITY_THRESHOLD    80.0  // Rh
+#define TEMPERATURE_THRESHOLD 23.0  // 32 // degC, ~90F
+#define UV_A_THRESHOLD        10 // uWatt / cm^2
+#define UV_B_THRESHOLD        0.05 // uWatt / cm^2
+#define UV_C_THRESHOLD        0.05 // uWatt / cm^2
 
 #define ENV_TIMER_ID 1337
 #define SAMPLES_PER_MINUTE 60
 #define DAYLIGHT_START 6 // 06:00am
 #define DAYLIGHT_END 18  // 06:00pm (18:00)
 #define ONE_MINUTE 60
-#define MAX_TIMER_FIRES 5
+#define MAX_TIMER_FIRES 3
 
 typedef enum status_state {
   OFF = 0,
@@ -57,8 +57,9 @@ typedef struct Environmental_control {
   uint32_t            timer_id;
 
   time_t              time_now;
+  struct tm           time_now_info;
   time_t              give_up_time;
-  struct tm           time_info;
+  struct tm           give_up_time_info;
   struct bme280_data  *time_series_ptr;
   int                 time_series_index;
 

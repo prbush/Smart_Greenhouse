@@ -36,6 +36,7 @@
 #include "esp_netif_sntp.h"
 #include "lwip/ip_addr.h"
 #include "esp_sntp.h"
+#include "esp_http_client.h"
 
 /* Custom components */
 #include "environmental_sensor.h"
@@ -56,11 +57,20 @@
 // TODO: remove unnecessary definitions and preprocessor commands
 #define USE_HOTSPOT
 
+
+#ifdef USE_HOTSPOT
+// #define EXAMPLE_ESP_WIFI_SSID      "Phil_iPhone"
+// #define EXAMPLE_ESP_WIFI_PASS      "esp32wificonnection"
+// #define EXAMPLE_ESP_WIFI_SSID      "Gomaas iPhone"
+// #define EXAMPLE_ESP_WIFI_PASS      "yousefisawesomeright"
+// #define EXAMPLE_ESP_WIFI_SSID      "PandaHat"
+// #define EXAMPLE_ESP_WIFI_PASS      "mitosismitosis"
+#define EXAMPLE_ESP_WIFI_SSID      "Noire"
+#define EXAMPLE_ESP_WIFI_PASS      "ahmad123"
+#else
 #define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
 #define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
-#define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
-#define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
-#define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
+#endif
 #define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
 
 #if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
@@ -154,7 +164,8 @@ static uint8_t red, green, blue;
 static int s_retry_num = 0;
 time_t now;
 struct tm timeinfo;
-struct tm global_start_time;
+struct tm global_start_time_info;
+time_t global_start_time;
 
 /* Passable Objects */
 Firebase fb;
@@ -217,7 +228,8 @@ void app_main(void)
   }
 
   // Get the start time
-  localtime_r(&now, &global_start_time);
+  global_start_time = now;
+  localtime_r(&now, &global_start_time_info);
 
   // Create RTOS threads
   xTaskCreate(firebase_task, "Firebase task", 16384, NULL, 5, &firebase_task_handle);
@@ -225,7 +237,7 @@ void app_main(void)
   xTaskCreate(sensors_task, "Sensors task", 8192, NULL, 5, &sensors_task_handle);
   xTaskCreate(environmental_control_task, "Env ctrl task", 8192, NULL, 5, &environmental_control_task_handle);
 
-  // This "main" FreeRTOS task will be deleted after returning and control will be with the scheduler
+  // This "main" task will exit and be cleaned up automatically
 }
 
 
@@ -303,6 +315,9 @@ void sensors_task(void* arg)
     esp_restart();
   }
 
+  // Start the sensor timer
+  xTimerStart(sensor_timer_handle, 1);
+
   while(1) {
     // Zero out the structs to start fresh
     memset(&sensor_data, 0, sizeof(sensor_data_struct));
@@ -343,8 +358,6 @@ void sensors_task(void* arg)
 
     // Send the sensor data to the environmental_control_task
     xQueueGenericSend(sensor_queue, &sensor_data, 1, queueSEND_TO_BACK);
-
-    vTaskDelay(1000);
   }
 }
 
@@ -361,24 +374,19 @@ void environmental_control_task(void *arg)
 
     // Wait until we get a message with sensor data
     xQueueReceive(sensor_queue, &sensor_data, portMAX_DELAY);
-    // Check for an empty message
 
     // Make enviromental changes (fan, pdlc, lights) as needed based on sensor data and set thresholds
-    // ...
     env_ctrl.process_env_data(sensor_data);
 
+    // Gather statuses of the fan, pdlc, lights
     status_data = env_ctrl.get_statuses();
     
-    // Gather statuses of the fan, pdlc, lights
-    // ...
-
     // Assemble the firebase data struct
     memcpy(&(firebase_data.sensor_data), &sensor_data, sizeof(sensor_data_struct));
     memcpy(&(firebase_data.status_data), &status_data, sizeof(status_data_struct));
 
     // Send the message to the firebase task
     xQueueSend(firebase_queue, &firebase_data, 1);
-
   }
 }
 
@@ -459,13 +467,8 @@ static void wifi_init_sta(void)
 
   wifi_config_t wifi_config = {
       .sta = {
-         #ifdef USE_HOTSPOT
-          .ssid = "Phil_iPhone",
-          .password = "esp32wificonnection",
-          #else
           .ssid = EXAMPLE_ESP_WIFI_SSID,
           .password = EXAMPLE_ESP_WIFI_PASS,
-          #endif
           /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
             * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
             * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
@@ -493,22 +496,12 @@ static void wifi_init_sta(void)
   /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
     * happened. */
   if (bits & WIFI_CONNECTED_BIT) {
-    #ifdef USE_HOTSPOT
-      ESP_LOGI(WIFI_TAG, "connected to ap SSID:%s password:%s",
-                "Phil_iPhone", "esp32wificonnection");
-    #else
       ESP_LOGI(WIFI_TAG, "connected to ap SSID:%s password:%s",
                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
 
-    #endif
   } else if (bits & WIFI_FAIL_BIT) {
-    #ifdef USE_HOTSPOT
-      ESP_LOGI(WIFI_TAG, "Failed to connect to SSID:%s, password:%s",
-                "Phil_iPhone", "esp32wificonnection");
-    #else
       ESP_LOGI(WIFI_TAG, "Failed to connect to SSID:%s, password:%s",
                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
-    #endif
   } else {
       ESP_LOGE(WIFI_TAG, "UNEXPECTED EVENT");
   }
@@ -593,12 +586,15 @@ static void sensor_timer_callback(TimerHandle_t xTimer)
 {
   EventBits_t wifi_status = xEventGroupGetBits(s_wifi_event_group);
   // Sanity check that another timer didn't magically fire this callback
-  if ((uint32_t)pvTimerGetTimerID(xTimer) != sensor_timer_id) {
+  if (*(uint32_t*)pvTimerGetTimerID(xTimer) != sensor_timer_id) {
     return;
   }
 
   // Check that we are connected to WiFi
   if (wifi_status & WIFI_CONNECTED_BIT) {
+    ESP_LOGI(SENSOR_TAG, "Sensor loop starting.");
     xEventGroupSetBits(task_control_events, SENSOR_CYCLE_START_BIT);
+  } else {
+    ESP_LOGE(WIFI_TAG, "WiFi not connected, unable to run sensor tasks.");
   }
 }

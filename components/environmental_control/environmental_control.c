@@ -7,7 +7,8 @@
 #include "sdkconfig.h"
 #include "environmental_control.h"
 
-extern struct tm global_start_time;
+extern struct tm global_start_time_info;
+extern time_t global_start_time;
 
 
 
@@ -59,6 +60,7 @@ esp_err_t environmental_control_init(Environmental_control *struct_ptr, Fan *fan
   self->over_humidity = false;
   self->get_statuses = _environmental_control_get_statuses;
   self->process_env_data = _environmental_control_process_env_data;
+  self->give_up_time_info = global_start_time_info;
 
   // Initialize the fan, lights, pdlc
   return_code = fan_init(self->fan, CONFIG_FAN_1_GPIO, CONFIG_FAN_2_GPIO);
@@ -96,28 +98,27 @@ static status_data_struct _environmental_control_get_statuses(void)
 
 static void _environmental_control_process_env_data(sensor_data_struct sensor_readings)
 {
+  bool daylight_time = false;
   // Grab the readings and the current time
   self->current_sensor_data = sensor_readings;
 
   time(&self->time_now);
-  localtime_r(&self->time_now, &self->time_info);
+  localtime_r(&self->time_now, &self->time_now_info);
 
   if (CLASS_DEMO) {
     // The lights will be on for 5 mins
-    if (self->time_info.tm_min >= global_start_time.tm_min) {
-      self->is_daylight = true;
-    } else if (self->time_info.tm_hour >= (global_start_time.tm_min + 5)) {
-      self->is_daylight = false;
-    }
+    daylight_time = (self->time_now_info.tm_min >= global_start_time_info.tm_min) &&
+                    (self->time_now_info.tm_min <= (global_start_time_info.tm_min + 5));
+    
+    self->is_daylight = daylight_time;
+
   } else {
     // The lights will be on during the daylight hours
-    if (self->time_info.tm_hour >= DAYLIGHT_START) {
-      self->is_daylight = true;
-    } else if (self->time_info.tm_hour >= DAYLIGHT_END) {
-      self->is_daylight = false;
-    }
+    daylight_time = (self->time_now_info.tm_hour >= DAYLIGHT_START) &&
+                    (self->time_now_info.tm_hour < DAYLIGHT_END);
+    
+    self->is_daylight = daylight_time;
   }
-
 /* if needed:
 
    uW/cm^2
@@ -143,75 +144,60 @@ static void _environmental_control_process_env_data(sensor_data_struct sensor_re
   manage_lights();
   manage_fans();
   manage_pdlc();
-
-
-  if (toggle % 5 == 0) {
-    fan_on = !fan_on;
-    if (!fan_on) {
-      self->fan->off();
-    } else {
-      self->fan->on();
-    }
-  }
-
-  if (toggle % 7 == 0) {
-    lights_on = !lights_on;
-    if (!lights_on) {
-      self->lights->off();
-    } else {
-      self->lights->on();
-    }
-  }
-
-  if (toggle % 3 == 0) {
-    pdlc_on = !pdlc_on;
-    if (!pdlc_on) {
-      self->pdlc->off();
-    } else {
-      self->pdlc->on();
-    }
-  }
-
-  toggle ++;
 }
 
 void check_for_env_changes_callback(TimerHandle_t xTimer)
 {
+  ESP_LOGE(ENVIRONMENTAL_TAG, "In timer callback.");
+
   self->timer_running = false;
   self->time_series_index = 0;
   // Sanity check that another timer didn't magically fire this callback
-  if ((uint32_t)pvTimerGetTimerID(xTimer) != self->timer_id) {
+  if (*(uint32_t*)pvTimerGetTimerID(xTimer) != self->timer_id) {
+    ESP_LOGE(ENVIRONMENTAL_TAG, "Timer ID did not match.");
     return;
   }
 
   /* Simple case first -- if the current temp and humidity are below
    * threshold values, then we can turn the fan off and move on. 
    */
+  self->over_temp = self->current_sensor_data.bme280_data.temperature > TEMPERATURE_THRESHOLD;
+  self->over_humidity = self->current_sensor_data.bme280_data.humidity > HUMIDITY_THRESHOLD;
+
   if (!(self->over_temp || self->over_humidity)) {
     // Reset the timer run counter
     self->timer_fires_counter = 0;
     // Turn off the fan
     self->fan->off();
-  }
-
-  /* Now the more complex case -- we are still over temp/humidity.
-   * In this case, we need to see if the slopes are negative. 
-   *  -If they are, then we can keep running, up to MAX_TIMER_FIRES to try
-   *   to get below threshold values.
-   *  -If the slopes are positive, then we cannot correct by using the fan
-   *   and should stop trying. 
-   */
-  bool has_negative_slope = check_slopes();
-  if (!has_negative_slope) {
-    time(&(self->give_up_time));
-    self->timer_fires_counter = 0;
   } else {
-    // We have a negative slope, need to see if we should keep trying
-    if (self->timer_fires_counter == MAX_TIMER_FIRES) {
+    /* Now the more complex case -- we are still over temp/humidity.
+    * In this case, we need to see if the slopes are negative. 
+    *  -If they are, then we can keep running, up to MAX_TIMER_FIRES to try
+    *   to get below threshold values.
+    *  -If the slopes are positive, then we cannot correct by using the fan
+    *   and should stop trying. 
+    */
+    bool has_negative_slope = check_slopes();
+    if (!has_negative_slope) {
       time(&(self->give_up_time));
+      localtime_r(&(self->give_up_time), &(self->give_up_time_info));
       self->timer_fires_counter = 0;
+
+      // Turn the fans on
+      self->fan->off();
+
     } else {
-      self->timer_fires_counter++;
+      // We have a negative slope, need to see if we should keep trying
+      if (self->timer_fires_counter == MAX_TIMER_FIRES) {
+        time(&(self->give_up_time));
+        localtime_r(&(self->give_up_time), &(self->give_up_time_info));
+        self->timer_fires_counter = 0;
+
+        // Turn the fans on
+        self->fan->off();
+      } else {
+        self->timer_fires_counter++;
+      }
     }
   }
   
@@ -241,7 +227,7 @@ static void manage_pdlc(void)
                       (self->uv_c_integral > UV_C_THRESHOLD);
     
     if (above_threshold && (self->pdlc->get_state() != PDLC_ON)) {
-      self->pdlc->off();
+      self->pdlc->on();
     }
 
   } else if (self->pdlc->get_state() != PDLC_OFF) {
@@ -280,16 +266,26 @@ static void manage_fans(void)
     if (self->over_temp || self->over_humidity) {
       // See if we should try to correct
 
-      // Start the timer
-      xTimerStart(self->timer_handle, 1);
-      self->timer_running = true;
+      // We'll keep trying if either this is the first time it has run or
+      // if an hour has elapsed since the last time we tried
+      bool keep_trying = (time(&(self->give_up_time)) == time(&global_start_time)) ||
+                         (self->give_up_time_info.tm_hour < self->time_now_info.tm_hour);
 
-      // Allocate our array
-      self->time_series_ptr = (struct bme280_data*) malloc(sizeof(struct bme280_data) * SAMPLES_PER_MINUTE);
-      self->time_series_index = 0;
+      if (keep_trying) {
+        // Start the timer
+        xTimerStart(self->timer_handle, 1);
+        self->timer_running = true;
 
-      // Store the current bme280 data for later comparison
-      self->time_series_ptr[self->time_series_index++] = self->current_sensor_data.bme280_data;
+        // Allocate our array
+        self->time_series_ptr = (struct bme280_data*) malloc(sizeof(struct bme280_data) * SAMPLES_PER_MINUTE);
+        self->time_series_index = 0;
+
+        // Store the current bme280 data for later comparison
+        self->time_series_ptr[self->time_series_index++] = self->current_sensor_data.bme280_data;
+
+        // Turn the fans on
+        self->fan->on();
+      }
     }
 
   } else {
@@ -297,10 +293,6 @@ static void manage_fans(void)
     if (self->time_series_index > (SAMPLES_PER_MINUTE - 1)) {
       self->time_series_ptr[self->time_series_index++] = self->current_sensor_data.bme280_data;
     }
-    // Store the over temp/humidity flags
-    // Check thresholds
-    self->over_temp = self->current_sensor_data.bme280_data.temperature > TEMPERATURE_THRESHOLD;
-    self->over_humidity = self->current_sensor_data.bme280_data.humidity > HUMIDITY_THRESHOLD;
   }
 }
 
