@@ -16,10 +16,10 @@
 #define CLASS_DEMO true
 
 #define HUMIDITY_THRESHOLD    80.0  // Rh
-#define TEMPERATURE_THRESHOLD 23.0  // 32 // degC, ~90F
-#define UV_A_THRESHOLD        10 // uWatt / cm^2
-#define UV_B_THRESHOLD        0.05 // uWatt / cm^2
-#define UV_C_THRESHOLD        0.05 // uWatt / cm^2
+#define TEMPERATURE_THRESHOLD 27.0  // degC, ~80F
+#define UV_A_THRESHOLD        150.0 // uWatt / cm^2
+#define UV_B_THRESHOLD        25.0 // uWatt / cm^2
+#define UV_C_THRESHOLD        25.0 // uWatt / cm^2
 
 #define ENV_TIMER_ID 1337
 #define SAMPLES_PER_MINUTE 60

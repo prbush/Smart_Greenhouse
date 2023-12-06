@@ -10,21 +10,6 @@
 extern struct tm global_start_time_info;
 extern time_t global_start_time;
 
-
-
-// Testing counter
-uint32_t toggle = 0;
-bool lights_on = false;
-bool fan_on = false;
-bool pdlc_on = false;
-
-
-
-
-
-
-
-
 // Static private object pointer
 static Environmental_control *self;
 
@@ -225,15 +210,19 @@ static void manage_pdlc(void)
     above_threshold = (self->uv_a_integral > UV_A_THRESHOLD) ||
                       (self->uv_b_integral > UV_B_THRESHOLD) ||
                       (self->uv_c_integral > UV_C_THRESHOLD);
-    
-    if (above_threshold && (self->pdlc->get_state() != PDLC_ON)) {
-      self->pdlc->on();
+
+    if (above_threshold) {
+      if (self->pdlc->get_state() != PDLC_OFF) {
+        self->pdlc->off();
+      }
+    } else {
+      if (self->pdlc->get_state() != PDLC_ON) {
+        self->pdlc->on();
+      }
     }
 
   } else if (self->pdlc->get_state() != PDLC_OFF) {
-    
     self->pdlc->off();
-
   }
 }
 
